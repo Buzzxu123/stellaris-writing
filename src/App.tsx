@@ -444,31 +444,22 @@ function safeMarkdownFilename(value: string) {
   return `${name || 'Untitled Note'}.md`
 }
 
-function plainTextWithIndent(content: string, mode: ParagraphMode) {
-  const prefix = mode === 'zh' ? '　　' : mode === 'en' ? '  ' : ''
-
+function plainTextForExport(content: string) {
   return content
     .split(/\n{2,}|\n/)
-    .map((paragraph) => `${prefix}${paragraph.trim()}`)
+    .map((paragraph) => paragraph.trim())
     .filter((paragraph) => paragraph.trim().length > 0)
     .join('\n\n')
 }
 
-function htmlWithIndent(piece: WritingPiece) {
-  const indent =
-    piece.paragraphMode === 'zh'
-      ? '2em'
-      : piece.paragraphMode === 'en'
-        ? '2ch'
-        : '0'
-
+function htmlForExport(piece: WritingPiece) {
   return piece.content
     .split(/\n{2,}|\n/)
     .map((paragraph) => paragraph.trim())
     .filter(Boolean)
     .map(
       (paragraph) =>
-        `<p style="margin:0 0 12px;text-indent:${indent};line-height:1.8;">${escapeHtml(paragraph)}</p>`,
+        `<p style="margin:0 0 12px;line-height:1.8;">${escapeHtml(paragraph)}</p>`,
     )
     .join('')
 }
@@ -511,25 +502,13 @@ function starIntensity(piece: WritingPiece) {
   return Math.min(100, Math.floor(countWriting(piece.content).effective / 30))
 }
 
-function normalizeEditorInput(value: string, mode: ParagraphMode) {
-  if (mode === 'zh') {
-    return value.replace(/(^|\n)　　/g, '$1')
-  }
-
-  if (mode === 'en') {
-    return value.replace(/(^|\n) {2}/g, '$1')
-  }
-
-  return value
-}
-
 function markdownForPiece(
   piece: WritingPiece,
   zodiac: Zodiac,
   star: ConstellationStar,
 ) {
   const stats = countWriting(piece.content)
-  const body = plainTextWithIndent(piece.content, piece.paragraphMode).trim()
+  const body = plainTextForExport(piece.content).trim()
 
   return [
     '---',
@@ -879,11 +858,8 @@ function App() {
   }
 
   async function copyPiece() {
-    const html = htmlWithIndent(selectedPiece)
-    const text = plainTextWithIndent(
-      selectedPiece.content,
-      selectedPiece.paragraphMode,
-    )
+    const html = htmlForExport(selectedPiece)
+    const text = plainTextForExport(selectedPiece.content)
 
     if (navigator.clipboard && 'ClipboardItem' in window) {
       await navigator.clipboard.write([
@@ -1329,11 +1305,7 @@ function App() {
           <textarea
             className={`writing-surface indent-${selectedPiece.paragraphMode}`}
             onKeyDown={handleWritingKeyDown}
-            onChange={(event) =>
-              updateCurrentEditorPage(
-                normalizeEditorInput(event.target.value, selectedPiece.paragraphMode),
-              )
-            }
+            onChange={(event) => updateCurrentEditorPage(event.target.value)}
             onContextMenu={openAnchorMenu}
             ref={writingSurfaceRef}
             spellCheck="true"
