@@ -65,7 +65,7 @@ The Windows installer:
 - installs the app for the current user
 - creates a desktop shortcut
 - creates a Start Menu shortcut
-- includes Tauri's WebView2 bootstrapper, so end users do not install Node.js or npm
+- includes Tauri's offline WebView2 installer, so end users do not install Node.js, npm, Rust, or WebView2
 
 Windows installers must be built on a Windows runner. Use the GitHub Actions workflow for that artifact.
 
