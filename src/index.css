@@ -1,0 +1,40 @@
+:root {
+  --night: #030a10;
+  --night-2: #07131d;
+  --ink: #eadfcb;
+  --muted: rgba(234, 223, 203, 0.62);
+  --gold: #e4b46e;
+  --blue-star: #b8dcff;
+  --display: Didot, 'Bodoni 72', 'Baskerville', 'Times New Roman', serif;
+  --serif: 'Iowan Old Style', 'Baskerville', Georgia, 'Songti SC', 'Noto Serif CJK SC', serif;
+  --sans: 'Avenir Next', 'Helvetica Neue', Arial, sans-serif;
+
+  color: var(--ink);
+  background: var(--night);
+  font-family: var(--serif);
+  font-size: 16px;
+  line-height: 1.5;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+::selection {
+  color: #1c130b;
+  background: var(--gold);
+}
