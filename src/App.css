@@ -55,6 +55,7 @@
 .theme-day .moon-card,
 .theme-day .moon-card span,
 .theme-day .moon-card p,
+.theme-day .moon-card small,
 .theme-day .compact-card span,
 .theme-day .zodiac-orb strong,
 .theme-day .zodiac-orb small,
@@ -259,6 +260,21 @@ button {
   font-size: 18px;
   font-style: italic;
   line-height: 1.45;
+  white-space: pre-line;
+}
+
+.moon-card small {
+  display: block;
+  color: rgba(234, 223, 203, 0.7);
+  font-family: var(--serif);
+  font-size: 15px;
+  font-style: italic;
+  line-height: 1.3;
+  text-align: right;
+}
+
+.theme-day .moon-card small {
+  color: rgba(0, 0, 0, 0.68);
 }
 
 .moon-card textarea:focus,
@@ -709,9 +725,10 @@ button {
 
 .status-column {
   position: relative;
-  display: grid;
+  display: flex;
+  flex-direction: column;
   align-content: start;
-  gap: 18px;
+  gap: 0;
   max-height: 100%;
   overflow: hidden auto;
   scrollbar-width: none;
@@ -737,12 +754,12 @@ button {
 
 .note-panel {
   position: relative;
-  z-index: 1;
+  z-index: 2;
   display: grid;
   align-content: start;
   gap: 22px;
-  min-height: max-content;
-  padding: 46px 34px 34px;
+  min-height: 100%;
+  padding: 46px 34px 46px;
   background: transparent;
   border: 1px solid transparent;
   border-radius: 8px;
@@ -825,7 +842,7 @@ button {
 .editor-meta button,
 .segmented-control button {
   position: relative;
-  z-index: 3;
+  z-index: 1;
   color: var(--ink);
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid rgba(224, 166, 89, 0.2);
@@ -833,7 +850,8 @@ button {
 
 .quote-card {
   position: relative;
-  z-index: 2;
+  z-index: 3;
+  flex: 0 0 auto;
   min-height: 204px;
   padding: 28px;
   display: grid;

@@ -958,7 +958,8 @@ function App() {
         </nav>
         <div className="sidebar-card moon-card">
           <span>☾</span>
-          <p>{defaultCopy.leftSlogan}</p>
+          <p>{appCopy.quote}</p>
+          <small>- {appCopy.author}</small>
         </div>
         <div className="sidebar-card compact-card">
           <strong>Weekly Compass</strong>
@@ -1201,31 +1202,6 @@ function App() {
                 {saveState.startsWith('Saved') ? 'Saved Markdown' : saveState}
               </button>
             </section>
-            <div className="quote-card">
-              <textarea
-                aria-label="Quote"
-                value={appCopy.quote}
-                onChange={(event) =>
-                  setAppCopy((current) => ({
-                    ...current,
-                    quote: event.target.value,
-                  }))
-                }
-              />
-              <label>
-                <span>-</span>
-                <input
-                  aria-label="Quote author"
-                  value={appCopy.author}
-                  onChange={(event) =>
-                    setAppCopy((current) => ({
-                      ...current,
-                      author: event.target.value,
-                    }))
-                  }
-                />
-              </label>
-            </div>
           </aside>
         </section>
       ) : viewMode === 'editor' ? (
@@ -1660,7 +1636,7 @@ function SettingsView({
           />
         </label>
         <label>
-          Right quote
+          Left quote
           <textarea
             value={appCopy.quote}
             onChange={(event) =>
@@ -1672,7 +1648,7 @@ function SettingsView({
           />
         </label>
         <label>
-          Quote author
+          Left quote author
           <input
             value={appCopy.author}
             onChange={(event) =>
