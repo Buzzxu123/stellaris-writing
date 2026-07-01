@@ -711,7 +711,6 @@ function App() {
     setSelectedIndex(nextIndex)
     setSelectedStarId(zodiacs[nextIndex].stars[0].id)
     setCopyState('Copy')
-    window.requestAnimationFrame(() => window.scrollTo({ left: 0, top: 0 }))
   }
 
   function getPieceState(zodiacId: string, starId: string): ProgressState {

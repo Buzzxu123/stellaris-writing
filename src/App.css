@@ -3,7 +3,8 @@
   --sidebar-bg: rgba(3, 10, 16, 0.78);
   --card-border: rgba(224, 166, 89, 0.3);
   --star-base-opacity: 0.18;
-  min-height: 100vh;
+  height: 100vh;
+  min-height: 0;
   display: grid;
   grid-template-columns: 248px minmax(0, 1fr);
   color: var(--ink);
@@ -115,7 +116,8 @@ button {
 .sidebar {
   position: relative;
   z-index: 2;
-  min-height: 100vh;
+  height: 100vh;
+  min-height: 0;
   padding: 30px 20px 24px;
   display: flex;
   flex-direction: column;
@@ -123,6 +125,7 @@ button {
   background: var(--sidebar-bg);
   border-right: 1px solid var(--card-border);
   box-shadow: 24px 0 60px rgba(0, 0, 0, 0.35);
+  overflow: hidden;
 }
 
 .brand,
@@ -318,9 +321,11 @@ button {
   position: relative;
   z-index: 1;
   min-width: 0;
+  height: 100vh;
   display: grid;
-  grid-template-rows: auto 1fr;
-  min-height: 100vh;
+  grid-template-rows: 104px minmax(0, 1fr);
+  min-height: 0;
+  overflow: hidden;
 }
 
 .topbar {
@@ -378,17 +383,21 @@ button {
 
 .galaxy-layout {
   position: relative;
+  height: calc(100vh - 104px);
   min-height: 0;
   padding: 0 22px 28px 44px;
   display: grid;
-  grid-template-columns: minmax(760px, 1fr) 344px;
+  grid-template-columns: minmax(0, 1fr) 344px;
   gap: 24px;
+  overflow: hidden;
 }
 
 .orbit-panel {
   position: relative;
-  min-height: 760px;
+  height: 100%;
+  min-height: 0;
   border-radius: 50%;
+  overflow: visible;
 }
 
 .orbit-panel::before,
@@ -655,6 +664,13 @@ button {
   display: grid;
   align-content: start;
   gap: 18px;
+  max-height: 100%;
+  overflow: hidden auto;
+  scrollbar-width: none;
+}
+
+.status-column::-webkit-scrollbar {
+  display: none;
 }
 
 .note-panel {
@@ -1160,11 +1176,13 @@ button {
 }
 
 .utility-layout {
+  height: calc(100vh - 104px);
   min-height: 0;
   padding: 0 52px 44px;
   display: grid;
   align-content: start;
   gap: 24px;
+  overflow: auto;
 }
 
 .utility-heading {
@@ -1422,6 +1440,7 @@ button {
   }
 
   .sidebar {
+    height: auto;
     min-height: auto;
     padding: 18px;
     display: grid;
