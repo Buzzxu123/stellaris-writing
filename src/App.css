@@ -1595,6 +1595,23 @@ button {
   gap: 14px;
 }
 
+.settings-note {
+  margin: 0;
+  padding: 12px 14px;
+  color: var(--gold);
+  background: rgba(224, 166, 89, 0.08);
+  border: 1px solid rgba(224, 166, 89, 0.2);
+  border-radius: 8px;
+  font-size: 14px;
+  letter-spacing: 0.04em;
+}
+
+.theme-day .settings-note {
+  color: #050505;
+  background: rgba(255, 247, 218, 0.58);
+  border-color: rgba(82, 62, 34, 0.24);
+}
+
 .language-toggle {
   align-self: end;
   min-height: 40px;

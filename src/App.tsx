@@ -76,7 +76,8 @@ type AppCopy = {
 type FontImport = {
   label: string
   family: string
-  dataUrl: string
+  dataUrl?: string
+  storageKey?: string
 }
 
 type FontSettings = {
@@ -452,6 +453,9 @@ const uiText = {
     englishFont: '英文字体',
     importChineseFont: '导入中文字体',
     importEnglishFont: '导入英文字体',
+    fontImportFailed: '字体导入失败，请确认文件格式正确后重试。',
+    fontImported: '字体已导入并启用。',
+    fontStorageFailed: '字体配置无法写入本地存储，已保留页面可用状态。请删除过大的导入字体后再试。',
   },
   en: {
     appSubtitle: 'WRITING CHECK-IN',
@@ -528,6 +532,9 @@ const uiText = {
     englishFont: 'English font',
     importChineseFont: 'Import Chinese font',
     importEnglishFont: 'Import English font',
+    fontImportFailed: 'Font import failed. Please check the file format and try again.',
+    fontImported: 'Font imported and enabled.',
+    fontStorageFailed: 'Font settings could not be saved locally. The page is still usable; remove oversized imported fonts and try again.',
   },
 } satisfies Record<Language, Record<string, string>>
 
@@ -563,6 +570,8 @@ const copyStorageKey = 'zodiac-writing-copy-v1'
 const themeStorageKey = 'zodiac-writing-theme-v1'
 const languageStorageKey = 'zodiac-writing-language-v1'
 const fontStorageKey = 'zodiac-writing-fonts-v1'
+const fontDatabaseName = 'stellaris-imported-fonts-v1'
+const fontStoreName = 'fonts'
 const editorPageSize = 1800
 const initialUpdatedAt = '2026-06-30T00:00:00.000Z'
 
@@ -580,27 +589,127 @@ const defaultFontSettings: FontSettings = {
 }
 
 function normalizeFontSettings(value: Partial<FontSettings> | null): FontSettings {
+  const normalizeImports = (imports: FontImport[] | undefined) =>
+    (imports ?? []).filter(
+      (font) =>
+        typeof font.label === 'string' &&
+        typeof font.family === 'string' &&
+        ((typeof font.dataUrl === 'string' && font.dataUrl.startsWith('data:')) ||
+          typeof font.storageKey === 'string'),
+    )
+
   return {
     ...defaultFontSettings,
     ...value,
-    zhImports: value?.zhImports ?? [],
-    enImports: value?.enImports ?? [],
+    zhImports: normalizeImports(value?.zhImports),
+    enImports: normalizeImports(value?.enImports),
   }
+}
+
+function parseStoredJson<T>(key: string, fallback: T): T {
+  const saved = window.localStorage.getItem(key)
+
+  if (!saved) {
+    return fallback
+  }
+
+  try {
+    return JSON.parse(saved) as T
+  } catch (error) {
+    console.warn(`Ignoring invalid local storage entry: ${key}`, error)
+    return fallback
+  }
+}
+
+function openFontDatabase() {
+  return new Promise<IDBDatabase>((resolve, reject) => {
+    const request = window.indexedDB.open(fontDatabaseName, 1)
+
+    request.onupgradeneeded = () => {
+      const db = request.result
+
+      if (!db.objectStoreNames.contains(fontStoreName)) {
+        db.createObjectStore(fontStoreName, { keyPath: 'id' })
+      }
+    }
+    request.onsuccess = () => resolve(request.result)
+    request.onerror = () => reject(request.error)
+  })
+}
+
+async function saveImportedFont(storageKey: string, file: File) {
+  const db = await openFontDatabase()
+
+  return new Promise<void>((resolve, reject) => {
+    const transaction = db.transaction(fontStoreName, 'readwrite')
+    const store = transaction.objectStore(fontStoreName)
+
+    store.put({
+      id: storageKey,
+      blob: file,
+      name: file.name,
+      type: file.type,
+      updatedAt: new Date().toISOString(),
+    })
+    transaction.oncomplete = () => {
+      db.close()
+      resolve()
+    }
+    transaction.onerror = () => {
+      db.close()
+      reject(transaction.error)
+    }
+    transaction.onabort = () => {
+      db.close()
+      reject(transaction.error)
+    }
+  })
+}
+
+async function loadImportedFont(storageKey: string) {
+  const db = await openFontDatabase()
+
+  return new Promise<Blob | null>((resolve, reject) => {
+    const transaction = db.transaction(fontStoreName, 'readonly')
+    const store = transaction.objectStore(fontStoreName)
+    const request = store.get(storageKey)
+
+    request.onsuccess = () => {
+      const record = request.result as { blob?: Blob } | undefined
+      resolve(record?.blob ?? null)
+    }
+    request.onerror = () => reject(request.error)
+    transaction.oncomplete = () => db.close()
+    transaction.onerror = () => {
+      db.close()
+      reject(transaction.error)
+    }
+    transaction.onabort = () => {
+      db.close()
+      reject(transaction.error)
+    }
+  })
 }
 
 function fontOptionKey(value: string) {
   return value.replace(/[^a-zA-Z0-9_-]/g, '-')
 }
 
-function customFontCss(settings: FontSettings) {
+function customFontCss(settings: FontSettings, fontUrls: Record<string, string>) {
   return [...settings.zhImports, ...settings.enImports]
-    .map(
-      (font) => `@font-face {
-  font-family: "${font.family}";
-  src: url("${font.dataUrl}");
+    .map((font) => {
+      const source = font.dataUrl ?? (font.storageKey ? fontUrls[font.storageKey] : '')
+
+      if (!source) {
+        return ''
+      }
+
+      return `@font-face {
+  font-family: "${font.family.replace(/["\\]/g, '')}";
+  src: url("${source.replace(/["\\\n\r]/g, '')}");
   font-display: swap;
-}`,
-    )
+}`
+    })
     .join('\n')
 }
 
@@ -872,28 +981,25 @@ function App() {
     const saved = window.localStorage.getItem(languageStorageKey)
     return saved === 'en' ? 'en' : 'zh'
   })
+  const [fontNotice, setFontNotice] = useState('')
   const [themeMode, setThemeMode] = useState<ThemeMode>(() => {
     const saved = window.localStorage.getItem(themeStorageKey)
     return saved === 'day' || saved === 'night' || saved === 'auto' ? saved : 'auto'
   })
   const [fontSettings, setFontSettings] = useState<FontSettings>(() => {
-    const saved = window.localStorage.getItem(fontStorageKey)
-    return normalizeFontSettings(saved ? JSON.parse(saved) : null)
+    return normalizeFontSettings(parseStoredJson<Partial<FontSettings> | null>(fontStorageKey, null))
   })
+  const [fontUrls, setFontUrls] = useState<Record<string, string>>({})
   const [appCopy, setAppCopy] = useState<AppCopy>(() => {
-    const saved = window.localStorage.getItem(copyStorageKey)
-    return saved ? { ...defaultCopy, ...JSON.parse(saved) } : defaultCopy
+    return {
+      ...defaultCopy,
+      ...parseStoredJson<Partial<AppCopy>>(copyStorageKey, {}),
+    }
   })
   const [pieces, setPieces] = useState<Record<string, WritingPiece>>(() => {
-    const saved = window.localStorage.getItem(storageKey)
-
-    if (!saved) {
-      return createInitialPieces()
-    }
-
     return normalizePieces({
       ...createInitialPieces(),
-      ...JSON.parse(saved),
+      ...parseStoredJson<Record<string, WritingPiece>>(storageKey, {}),
     })
   })
 
@@ -906,7 +1012,10 @@ function App() {
   const activeTheme = themeMode === 'auto' ? getAutoTheme(now) : themeMode
   const t = uiText[language]
   const activeMottos = language === 'zh' ? zodiacMottosZh : zodiacMottos
-  const activeFontCss = useMemo(() => customFontCss(fontSettings), [fontSettings])
+  const activeFontCss = useMemo(
+    () => customFontCss(fontSettings, fontUrls),
+    [fontSettings, fontUrls],
+  )
   const appStyle = {
     '--font-zh': fontSettings.zhFont,
     '--font-en': fontSettings.enFont,
@@ -956,8 +1065,54 @@ function App() {
   }, [language])
 
   useEffect(() => {
-    window.localStorage.setItem(fontStorageKey, JSON.stringify(fontSettings))
-  }, [fontSettings])
+    try {
+      window.localStorage.setItem(fontStorageKey, JSON.stringify(fontSettings))
+    } catch (error) {
+      console.warn('Unable to persist font settings', error)
+      setFontNotice(uiText[language].fontStorageFailed)
+    }
+  }, [fontSettings, language])
+
+  useEffect(() => {
+    let cancelled = false
+    const objectUrls: string[] = []
+    const imports = [...fontSettings.zhImports, ...fontSettings.enImports].filter(
+      (font) => font.storageKey,
+    )
+
+    async function hydrateImportedFonts() {
+      const nextUrls: Record<string, string> = {}
+
+      for (const font of imports) {
+        if (!font.storageKey) {
+          continue
+        }
+
+        try {
+          const blob = await loadImportedFont(font.storageKey)
+
+          if (blob) {
+            const objectUrl = URL.createObjectURL(blob)
+            objectUrls.push(objectUrl)
+            nextUrls[font.storageKey] = objectUrl
+          }
+        } catch (error) {
+          console.warn('Unable to load imported font', error)
+        }
+      }
+
+      if (!cancelled) {
+        setFontUrls(nextUrls)
+      }
+    }
+
+    hydrateImportedFonts()
+
+    return () => {
+      cancelled = true
+      objectUrls.forEach((url) => URL.revokeObjectURL(url))
+    }
+  }, [fontSettings.zhImports, fontSettings.enImports])
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(new Date()), 1000)
@@ -1657,9 +1812,11 @@ function App() {
             <SettingsView
               appCopy={appCopy}
               fontSettings={fontSettings}
+              fontNotice={fontNotice}
               language={language}
               selectedPiece={selectedPiece}
               onCopyChange={setAppCopy}
+              onFontNoticeChange={setFontNotice}
               onFontSettingsChange={setFontSettings}
               onSelectedPieceChange={updateSelectedPiece}
             />
@@ -1914,17 +2071,21 @@ function CalendarView({
 function SettingsView({
   appCopy,
   fontSettings,
+  fontNotice,
   language,
   selectedPiece,
   onCopyChange,
+  onFontNoticeChange,
   onFontSettingsChange,
   onSelectedPieceChange,
 }: {
   appCopy: AppCopy
   fontSettings: FontSettings
+  fontNotice: string
   language: Language
   selectedPiece: WritingPiece
   onCopyChange: Dispatch<SetStateAction<AppCopy>>
+  onFontNoticeChange: Dispatch<SetStateAction<string>>
   onFontSettingsChange: Dispatch<SetStateAction<FontSettings>>
   onSelectedPieceChange: (update: Partial<WritingPiece>) => void
 }) {
@@ -1944,20 +2105,26 @@ function SettingsView({
     })),
   ]
 
-  function importFont(event: ChangeEvent<HTMLInputElement>, kind: 'zh' | 'en') {
+  async function importFont(event: ChangeEvent<HTMLInputElement>, kind: 'zh' | 'en') {
     const file = event.target.files?.[0]
+    event.target.value = ''
 
     if (!file) {
       return
     }
 
-    const reader = new FileReader()
-    reader.onload = () => {
+    onFontNoticeChange('')
+
+    try {
       const family = `Stellaris-${kind}-${Date.now()}`
+      const storageKey = `${kind}-${Date.now()}-${Math.random().toString(36).slice(2)}`
+
+      await saveImportedFont(storageKey, file)
+
       const font = {
         label: file.name.replace(/\.[^.]+$/, ''),
         family,
-        dataUrl: String(reader.result),
+        storageKey,
       }
 
       onFontSettingsChange((current) => ({
@@ -1966,9 +2133,11 @@ function SettingsView({
           ? { zhFont: `"${family}"`, zhImports: [...current.zhImports, font] }
           : { enFont: `"${family}"`, enImports: [...current.enImports, font] }),
       }))
+      onFontNoticeChange(t.fontImported)
+    } catch (error) {
+      console.warn('Unable to import font', error)
+      onFontNoticeChange(t.fontImportFailed)
     }
-    reader.readAsDataURL(file)
-    event.target.value = ''
   }
 
   return (
@@ -2057,7 +2226,7 @@ function SettingsView({
           <label>
             {t.importChineseFont}
             <input
-              accept=".otf,.ttf,.woff,.woff2,font/*"
+              accept=".otf,.ttc,.ttf,.woff,.woff2,font/*"
               type="file"
               onChange={(event) => importFont(event, 'zh')}
             />
@@ -2065,12 +2234,13 @@ function SettingsView({
           <label>
             {t.importEnglishFont}
             <input
-              accept=".otf,.ttf,.woff,.woff2,font/*"
+              accept=".otf,.ttc,.ttf,.woff,.woff2,font/*"
               type="file"
               onChange={(event) => importFont(event, 'en')}
             />
           </label>
         </div>
+        {fontNotice ? <p className="settings-note">{fontNotice}</p> : null}
       </div>
     </>
   )
