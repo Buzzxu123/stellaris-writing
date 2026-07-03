@@ -5,17 +5,26 @@ import type {
   Dispatch,
   KeyboardEvent,
   MouseEvent,
+  PointerEvent,
   SetStateAction,
 } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import './App.css'
 
 type ProgressState = 'unbound' | 'draft' | 'lit'
-type ViewMode = 'galaxy' | 'editor' | 'notes' | 'statistics' | 'calendar' | 'settings'
+type ViewMode =
+  | 'galaxy'
+  | 'editor'
+  | 'notes'
+  | 'whiteboards'
+  | 'statistics'
+  | 'calendar'
+  | 'settings'
 type ParagraphMode = 'zh' | 'en' | 'none'
 type ThemeMode = 'auto' | 'day' | 'night'
 type ActiveTheme = 'day' | 'night'
 type Language = 'zh' | 'en'
+type WhiteboardMode = 'select' | 'node' | 'connect' | 'draw' | 'erase'
 
 type ConstellationStar = {
   id: string
@@ -85,6 +94,56 @@ type FontSettings = {
   enFont: string
   zhImports: FontImport[]
   enImports: FontImport[]
+}
+
+type WhiteboardNode = {
+  id: string
+  x: number
+  y: number
+  text: string
+}
+
+type WhiteboardEdge = {
+  id: string
+  from: string
+  to: string
+  label: string
+}
+
+type WhiteboardStroke = {
+  id: string
+  points: Array<{ x: number; y: number }>
+  color: string
+  width: number
+}
+
+type WhiteboardImage = {
+  id: string
+  x: number
+  y: number
+  width: number
+  height: number
+  dataUrl: string
+}
+
+type Whiteboard = {
+  id: string
+  title: string
+  updatedAt: string
+  nodes: WhiteboardNode[]
+  edges: WhiteboardEdge[]
+  strokes: WhiteboardStroke[]
+  images: WhiteboardImage[]
+}
+
+type AppSnapshot = {
+  schemaVersion: 1
+  savedAt: string
+  pieces: Record<string, WritingPiece>
+  whiteboards: Record<string, Whiteboard>
+  appCopy: AppCopy
+  themeMode: ThemeMode
+  language: Language
 }
 
 const zodiacs: Zodiac[] = [
@@ -382,6 +441,7 @@ const uiText = {
     appSubtitle: '写作打卡',
     navCheckIn: '打卡',
     navNotes: '我的笔记',
+    navWhiteboards: '添加白板',
     navStats: '统计',
     navCalendar: '日历',
     navSettings: '设置',
@@ -462,11 +522,38 @@ const uiText = {
     activeFont: '正在启用',
     useFont: '启用',
     deleteFont: '删除',
+    migrationTitle: '备份与迁移',
+    backupNow: '立即备份',
+    restoreBackup: '从备份恢复',
+    exportMigration: '导出迁移文件',
+    backupSaved: '备份已保存：',
+    backupRestored: '备份已恢复。',
+    backupEmpty: '还没有找到可恢复的备份。',
+    backupFailed: '备份或迁移失败，请稍后重试。',
+    migrationExported: '迁移文件已导出：',
+    whiteboardsEyebrow: '◎ 白板',
+    whiteboardsTitle: '人物与世界观白板',
+    newWhiteboard: '新建白板',
+    searchWhiteboards: '搜索白板标题',
+    whiteboardPlaceholder: '输入白板标题...',
+    noWhiteboards: '还没有白板',
+    deleteWhiteboard: '删除白板',
+    exportPdf: '导出 PDF',
+    addPoint: '圆点',
+    connectPoints: '连线',
+    handDraw: '手绘',
+    eraseDrawings: '擦除',
+    undoWhiteboard: '撤回',
+    moveCanvas: '拖拽',
+    importSketch: '导入手绘图片',
+    pointText: '人物 / 地点 / 设定',
+    lineText: '关系 / 矛盾 / 线索',
   },
   en: {
     appSubtitle: 'WRITING CHECK-IN',
     navCheckIn: 'Check-In',
     navNotes: 'My Notes',
+    navWhiteboards: 'Whiteboards',
     navStats: 'Statistics',
     navCalendar: 'Calendar',
     navSettings: 'Settings',
@@ -547,6 +634,32 @@ const uiText = {
     activeFont: 'Active',
     useFont: 'Use',
     deleteFont: 'Delete',
+    migrationTitle: 'Backup & Migration',
+    backupNow: 'Back Up Now',
+    restoreBackup: 'Restore Backup',
+    exportMigration: 'Export Migration File',
+    backupSaved: 'Backup saved: ',
+    backupRestored: 'Backup restored.',
+    backupEmpty: 'No backup was found to restore.',
+    backupFailed: 'Backup or migration failed. Please try again.',
+    migrationExported: 'Migration file exported: ',
+    whiteboardsEyebrow: '◎ Whiteboards',
+    whiteboardsTitle: 'Characters & world maps',
+    newWhiteboard: 'New Whiteboard',
+    searchWhiteboards: 'Search whiteboard titles',
+    whiteboardPlaceholder: 'Whiteboard title...',
+    noWhiteboards: 'No whiteboards yet',
+    deleteWhiteboard: 'Delete whiteboard',
+    exportPdf: 'Export PDF',
+    addPoint: 'Point',
+    connectPoints: 'Connect',
+    handDraw: 'Draw',
+    eraseDrawings: 'Erase',
+    undoWhiteboard: 'Undo',
+    moveCanvas: 'Move',
+    importSketch: 'Import sketch',
+    pointText: 'Character / place / lore',
+    lineText: 'Relationship / conflict / clue',
   },
 } satisfies Record<Language, Record<string, string>>
 
@@ -578,12 +691,14 @@ function buildPreviewDraft() {
 }
 
 const storageKey = 'zodiac-writing-pieces-v2'
+const whiteboardStorageKey = 'zodiac-writing-whiteboards-v1'
 const copyStorageKey = 'zodiac-writing-copy-v1'
 const themeStorageKey = 'zodiac-writing-theme-v1'
 const languageStorageKey = 'zodiac-writing-language-v1'
 const fontStorageKey = 'zodiac-writing-fonts-v1'
 const fontDatabaseName = 'stellaris-imported-fonts-v1'
 const fontStoreName = 'fonts'
+const appSnapshotSchemaVersion = 1
 const editorPageSize = 1800
 const initialUpdatedAt = '2026-06-30T00:00:00.000Z'
 
@@ -631,6 +746,76 @@ function parseStoredJson<T>(key: string, fallback: T): T {
     console.warn(`Ignoring invalid local storage entry: ${key}`, error)
     return fallback
   }
+}
+
+function normalizeAppSnapshot(value: unknown): AppSnapshot | null {
+  if (!value || typeof value !== 'object') {
+    return null
+  }
+
+  const snapshot = value as Partial<AppSnapshot>
+
+  if (
+    snapshot.schemaVersion !== appSnapshotSchemaVersion ||
+    typeof snapshot.savedAt !== 'string' ||
+    !snapshot.pieces ||
+    typeof snapshot.pieces !== 'object' ||
+    !snapshot.appCopy ||
+    typeof snapshot.appCopy !== 'object'
+  ) {
+    return null
+  }
+
+  const themeMode =
+    snapshot.themeMode === 'day' || snapshot.themeMode === 'night' || snapshot.themeMode === 'auto'
+      ? snapshot.themeMode
+      : 'auto'
+  const language = snapshot.language === 'en' ? 'en' : 'zh'
+
+  return {
+    schemaVersion: appSnapshotSchemaVersion,
+    savedAt: snapshot.savedAt,
+    pieces: normalizePieces({
+      ...createInitialPieces(),
+      ...snapshot.pieces,
+    }),
+    whiteboards: normalizeWhiteboards(snapshot.whiteboards),
+    appCopy: {
+      ...defaultCopy,
+      ...snapshot.appCopy,
+    },
+    themeMode,
+    language,
+  }
+}
+
+function latestPiecesTimestamp(pieces: Record<string, WritingPiece>) {
+  return Object.values(pieces).reduce((latest, piece) => {
+    const timestamp = Date.parse(piece.updatedAt)
+    return Number.isFinite(timestamp) ? Math.max(latest, timestamp) : latest
+  }, 0)
+}
+
+function createAppSnapshot(
+  pieces: Record<string, WritingPiece>,
+  whiteboards: Record<string, Whiteboard>,
+  appCopy: AppCopy,
+  themeMode: ThemeMode,
+  language: Language,
+): AppSnapshot {
+  return {
+    schemaVersion: appSnapshotSchemaVersion,
+    savedAt: new Date().toISOString(),
+    pieces,
+    whiteboards,
+    appCopy,
+    themeMode,
+    language,
+  }
+}
+
+function isTauriRuntime() {
+  return '__TAURI_INTERNALS__' in window
 }
 
 function openFontDatabase() {
@@ -777,6 +962,61 @@ function createInitialPieces() {
       }),
     ),
   )
+}
+
+function createId(prefix: string) {
+  const id =
+    typeof window.crypto?.randomUUID === 'function'
+      ? window.crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(36).slice(2)}`
+
+  return `${prefix}-${id}`
+}
+
+function createInitialWhiteboard(): Whiteboard {
+  return {
+    id: createId('board'),
+    title: 'Character Constellation',
+    updatedAt: new Date().toISOString(),
+    nodes: [
+      { id: createId('node'), x: 360, y: 220, text: 'Protagonist' },
+      { id: createId('node'), x: 640, y: 300, text: 'Hidden ally' },
+    ],
+    edges: [],
+    strokes: [],
+    images: [],
+  }
+}
+
+function normalizeWhiteboard(value: Partial<Whiteboard>): Whiteboard {
+  return {
+    id: typeof value.id === 'string' ? value.id : createId('board'),
+    title: typeof value.title === 'string' && value.title.trim() ? value.title : 'Untitled Board',
+    updatedAt: typeof value.updatedAt === 'string' ? value.updatedAt : new Date().toISOString(),
+    nodes: Array.isArray(value.nodes)
+      ? value.nodes.filter((node): node is WhiteboardNode => typeof node.id === 'string')
+      : [],
+    edges: Array.isArray(value.edges)
+      ? value.edges.filter((edge): edge is WhiteboardEdge => typeof edge.id === 'string')
+      : [],
+    strokes: Array.isArray(value.strokes)
+      ? value.strokes.filter((stroke): stroke is WhiteboardStroke => typeof stroke.id === 'string')
+      : [],
+    images: Array.isArray(value.images)
+      ? value.images.filter((image): image is WhiteboardImage => typeof image.id === 'string')
+      : [],
+  }
+}
+
+function normalizeWhiteboards(value: Record<string, Whiteboard> | null | undefined) {
+  const entries = Object.values(value ?? {}).map((board) => normalizeWhiteboard(board))
+
+  if (entries.length === 0) {
+    const board = createInitialWhiteboard()
+    return { [board.id]: board }
+  }
+
+  return Object.fromEntries(entries.map((board) => [board.id, board]))
 }
 
 function normalizePieces(pieces: Record<string, WritingPiece>) {
@@ -1011,6 +1251,7 @@ function App() {
   } | null>(null)
   const [anchorPreview, setAnchorPreview] = useState<StarAnchor | null>(null)
   const writingSurfaceRef = useRef<HTMLTextAreaElement>(null)
+  const lastSnapshotRef = useRef('')
   const [now, setNow] = useState(() => new Date())
   const [language, setLanguage] = useState<Language>(() => {
     const saved = window.localStorage.getItem(languageStorageKey)
@@ -1025,6 +1266,7 @@ function App() {
     return normalizeFontSettings(parseStoredJson<Partial<FontSettings> | null>(fontStorageKey, null))
   })
   const [fontUrls, setFontUrls] = useState<Record<string, string>>({})
+  const [migrationNotice, setMigrationNotice] = useState('')
   const [appCopy, setAppCopy] = useState<AppCopy>(() => {
     return {
       ...defaultCopy,
@@ -1037,6 +1279,11 @@ function App() {
       ...parseStoredJson<Record<string, WritingPiece>>(storageKey, {}),
     })
   })
+  const [whiteboards, setWhiteboards] = useState<Record<string, Whiteboard>>(() =>
+    normalizeWhiteboards(parseStoredJson<Record<string, Whiteboard> | null>(whiteboardStorageKey, null)),
+  )
+  const startupPiecesRef = useRef(pieces)
+  const [snapshotReady, setSnapshotReady] = useState(false)
 
   const selectedZodiac = zodiacs[selectedIndex]
   const selectedStar =
@@ -1088,9 +1335,139 @@ function App() {
     return { lit, total, percent: Math.round((lit / total) * 100) }
   }, [zodiacProgress])
 
+  function applyAppSnapshot(snapshot: AppSnapshot) {
+    setPieces(snapshot.pieces)
+    setWhiteboards(snapshot.whiteboards)
+    setAppCopy(snapshot.appCopy)
+    setThemeMode(snapshot.themeMode)
+    setLanguage(snapshot.language)
+  }
+
+  async function saveSnapshotNow() {
+    try {
+      const path = await invoke<string>('save_app_snapshot', {
+        contents: JSON.stringify(createAppSnapshot(pieces, whiteboards, appCopy, themeMode, language)),
+      })
+      setMigrationNotice(`${t.backupSaved}${path}`)
+    } catch (error) {
+      console.warn('Unable to save app snapshot', error)
+      setMigrationNotice(t.backupFailed)
+    }
+  }
+
+  async function restoreSnapshot() {
+    try {
+      const raw = await invoke<string | null>('load_app_snapshot')
+
+      if (!raw) {
+        setMigrationNotice(t.backupEmpty)
+        return
+      }
+
+      const snapshot = normalizeAppSnapshot(JSON.parse(raw))
+
+      if (!snapshot) {
+        setMigrationNotice(t.backupFailed)
+        return
+      }
+
+      applyAppSnapshot(snapshot)
+      setMigrationNotice(t.backupRestored)
+    } catch (error) {
+      console.warn('Unable to restore app snapshot', error)
+      setMigrationNotice(t.backupFailed)
+    }
+  }
+
+  async function exportMigrationFile() {
+    try {
+      const path = await invoke<string>('export_migration_file', {
+        contents: JSON.stringify(
+          createAppSnapshot(pieces, whiteboards, appCopy, themeMode, language),
+          null,
+          2,
+        ),
+      })
+      setMigrationNotice(`${t.migrationExported}${path}`)
+    } catch (error) {
+      console.warn('Unable to export migration file', error)
+      setMigrationNotice(t.backupFailed)
+    }
+  }
+
+  useEffect(() => {
+    let cancelled = false
+
+    async function hydrateSnapshot() {
+      if (!isTauriRuntime()) {
+        setSnapshotReady(true)
+        return
+      }
+
+      try {
+        const raw = await invoke<string | null>('load_app_snapshot')
+        const snapshot = raw ? normalizeAppSnapshot(JSON.parse(raw)) : null
+
+        if (!cancelled && snapshot) {
+          const snapshotLatest = Math.max(
+            latestPiecesTimestamp(snapshot.pieces),
+            Date.parse(snapshot.savedAt) || 0,
+          )
+          const localLatest = latestPiecesTimestamp(startupPiecesRef.current)
+
+          if (snapshotLatest >= localLatest) {
+            applyAppSnapshot(snapshot)
+          }
+        }
+      } catch (error) {
+        console.warn('Unable to load app snapshot', error)
+      } finally {
+        if (!cancelled) {
+          setSnapshotReady(true)
+        }
+      }
+    }
+
+    hydrateSnapshot()
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
   useEffect(() => {
     window.localStorage.setItem(storageKey, JSON.stringify(pieces))
   }, [pieces])
+
+  useEffect(() => {
+    window.localStorage.setItem(whiteboardStorageKey, JSON.stringify(whiteboards))
+  }, [whiteboards])
+
+  useEffect(() => {
+    if (!snapshotReady || !isTauriRuntime()) {
+      return
+    }
+
+    const snapshot = createAppSnapshot(pieces, whiteboards, appCopy, themeMode, language)
+    const serialized = JSON.stringify(snapshot)
+
+    if (serialized === lastSnapshotRef.current) {
+      return
+    }
+
+    const timer = window.setTimeout(() => {
+      invoke<string>('save_app_snapshot', { contents: serialized })
+        .then((path) => {
+          lastSnapshotRef.current = serialized
+          console.info(`Saved app snapshot: ${path}`)
+        })
+        .catch((error) => {
+          console.warn('Unable to save app snapshot', error)
+        })
+    }, 600)
+
+    return () => window.clearTimeout(timer)
+  }, [appCopy, language, pieces, snapshotReady, themeMode, whiteboards])
 
   useEffect(() => {
     window.localStorage.setItem(copyStorageKey, JSON.stringify(appCopy))
@@ -1388,6 +1765,14 @@ function App() {
           >
             <span>□</span>
             {t.navNotes}
+          </button>
+          <button
+            className={viewMode === 'whiteboards' ? 'active' : ''}
+            type="button"
+            onClick={() => navigateTo('whiteboards')}
+          >
+            <span>◎</span>
+            {t.navWhiteboards}
           </button>
           <button
             className={viewMode === 'statistics' ? 'active' : ''}
@@ -1827,7 +2212,10 @@ function App() {
           ) : null}
         </section>
       ) : (
-        <section className="utility-layout" aria-label={`${viewMode} view`}>
+        <section
+          className={`utility-layout ${viewMode === 'whiteboards' ? 'whiteboard-utility' : ''}`}
+          aria-label={`${viewMode} view`}
+        >
           {viewMode === 'notes' ? (
             <NotesView
               onTitleChange={(pieceId, title) => updatePiece(pieceId, { title })}
@@ -1844,6 +2232,13 @@ function App() {
               }}
             />
           ) : null}
+          {viewMode === 'whiteboards' ? (
+            <WhiteboardsView
+              language={language}
+              whiteboards={whiteboards}
+              onWhiteboardsChange={setWhiteboards}
+            />
+          ) : null}
           {viewMode === 'statistics' ? (
             <StatisticsView language={language} pieces={pieces} totalProgress={totalProgress} />
           ) : null}
@@ -1854,10 +2249,14 @@ function App() {
               fontSettings={fontSettings}
               fontNotice={fontNotice}
               language={language}
+              migrationNotice={migrationNotice}
               selectedPiece={selectedPiece}
+              onBackupNow={saveSnapshotNow}
               onCopyChange={setAppCopy}
+              onExportMigration={exportMigrationFile}
               onFontNoticeChange={setFontNotice}
               onFontSettingsChange={setFontSettings}
+              onRestoreBackup={restoreSnapshot}
               onSelectedPieceChange={updateSelectedPiece}
             />
           ) : null}
@@ -1959,6 +2358,512 @@ function NotesView({
             </article>
           )
         })}
+      </div>
+    </>
+  )
+}
+
+function WhiteboardsView({
+  language,
+  whiteboards,
+  onWhiteboardsChange,
+}: {
+  language: Language
+  whiteboards: Record<string, Whiteboard>
+  onWhiteboardsChange: Dispatch<SetStateAction<Record<string, Whiteboard>>>
+}) {
+  const t = uiText[language]
+  const boards = useMemo(
+    () =>
+      Object.values(whiteboards).sort(
+        (a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt),
+      ),
+    [whiteboards],
+  )
+  const [selectedBoardId, setSelectedBoardId] = useState(() => boards[0]?.id ?? '')
+  const [search, setSearch] = useState('')
+  const [mode, setMode] = useState<WhiteboardMode>('select')
+  const [pan, setPan] = useState({ x: 0, y: 0 })
+  const [draggingNodeId, setDraggingNodeId] = useState<string | null>(null)
+  const [panning, setPanning] = useState(false)
+  const [connectFromId, setConnectFromId] = useState<string | null>(null)
+  const [draftStroke, setDraftStroke] = useState<WhiteboardStroke | null>(null)
+  const boardSurfaceRef = useRef<HTMLDivElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const selectedBoard = whiteboards[selectedBoardId] ?? boards[0]
+  const filteredBoards = boards.filter((board) =>
+    board.title.toLowerCase().includes(search.toLowerCase()),
+  )
+  const boardNodes = selectedBoard?.nodes ?? []
+  const boardEdges = selectedBoard?.edges ?? []
+  const boardStrokes = selectedBoard?.strokes ?? []
+  const boardImages = selectedBoard?.images ?? []
+
+  useEffect(() => {
+    if (!selectedBoard && boards[0]) {
+      setSelectedBoardId(boards[0].id)
+    }
+  }, [boards, selectedBoard])
+
+  function touchBoard(board: Whiteboard): Whiteboard {
+    return { ...board, updatedAt: new Date().toISOString() }
+  }
+
+  function updateBoard(boardId: string, update: (board: Whiteboard) => Whiteboard) {
+    onWhiteboardsChange((current) => {
+      const board = current[boardId]
+      if (!board) return current
+      return { ...current, [boardId]: touchBoard(update(board)) }
+    })
+  }
+
+  function pointDistanceToSegment(
+    point: { x: number; y: number },
+    start: { x: number; y: number },
+    end: { x: number; y: number },
+  ) {
+    const dx = end.x - start.x
+    const dy = end.y - start.y
+
+    if (dx === 0 && dy === 0) {
+      return Math.hypot(point.x - start.x, point.y - start.y)
+    }
+
+    const position = Math.max(
+      0,
+      Math.min(1, ((point.x - start.x) * dx + (point.y - start.y) * dy) / (dx * dx + dy * dy)),
+    )
+    return Math.hypot(point.x - (start.x + position * dx), point.y - (start.y + position * dy))
+  }
+
+  function strokeNearPoint(stroke: WhiteboardStroke, point: { x: number; y: number }) {
+    return stroke.points
+      .slice(1)
+      .some((current, index) => pointDistanceToSegment(point, stroke.points[index], current) < 18)
+  }
+
+  function eraseAt(point: { x: number; y: number }) {
+    if (!selectedBoard) return
+    updateBoard(selectedBoard.id, (board) => ({
+      ...board,
+      strokes: board.strokes.filter((stroke) => !strokeNearPoint(stroke, point)),
+    }))
+  }
+
+  function deleteNode(nodeId: string) {
+    if (!selectedBoard) return
+    const confirmed = window.confirm(
+      language === 'zh' ? '确认删除这个圆点吗？相关连线也会删除。' : 'Delete this point? Related lines will also be removed.',
+    )
+
+    if (!confirmed) return
+
+    updateBoard(selectedBoard.id, (board) => ({
+      ...board,
+      nodes: board.nodes.filter((node) => node.id !== nodeId),
+      edges: board.edges.filter((edge) => edge.from !== nodeId && edge.to !== nodeId),
+    }))
+  }
+
+  function undoWhiteboardStep() {
+    if (!selectedBoard) return
+    updateBoard(selectedBoard.id, (board) => {
+      if (board.strokes.length > 0) {
+        return { ...board, strokes: board.strokes.slice(0, -1) }
+      }
+      if (board.images.length > 0) {
+        return { ...board, images: board.images.slice(0, -1) }
+      }
+      if (board.edges.length > 0) {
+        return { ...board, edges: board.edges.slice(0, -1) }
+      }
+      if (board.nodes.length > 0) {
+        const lastNode = board.nodes[board.nodes.length - 1]
+        return {
+          ...board,
+          nodes: board.nodes.slice(0, -1),
+          edges: board.edges.filter((edge) => edge.from !== lastNode.id && edge.to !== lastNode.id),
+        }
+      }
+      return board
+    })
+  }
+
+  function createBoard() {
+    const board = createInitialWhiteboard()
+    board.title = language === 'zh' ? '新白板' : 'New Whiteboard'
+    onWhiteboardsChange((current) => ({ ...current, [board.id]: board }))
+    setSelectedBoardId(board.id)
+  }
+
+  function deleteBoard(boardId: string) {
+    onWhiteboardsChange((current) => {
+      const next = { ...current }
+      delete next[boardId]
+      if (Object.keys(next).length === 0) {
+        const board = createInitialWhiteboard()
+        board.title = language === 'zh' ? '新白板' : 'New Whiteboard'
+        setSelectedBoardId(board.id)
+        return { [board.id]: board }
+      }
+      const [nextBoard] = Object.values(next).sort(
+        (a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt),
+      )
+      setSelectedBoardId(nextBoard.id)
+      return next
+    })
+  }
+
+  function canvasPoint(event: PointerEvent<HTMLElement>) {
+    const rect = boardSurfaceRef.current?.getBoundingClientRect()
+    return {
+      x: event.clientX - (rect?.left ?? 0) - pan.x,
+      y: event.clientY - (rect?.top ?? 0) - pan.y,
+    }
+  }
+
+  function handleSurfacePointerDown(event: PointerEvent<HTMLDivElement>) {
+    if (!selectedBoard) return
+    if (mode === 'node') {
+      const point = canvasPoint(event)
+      updateBoard(selectedBoard.id, (board) => ({
+        ...board,
+        nodes: [...board.nodes, { id: createId('node'), x: point.x, y: point.y, text: t.pointText }],
+      }))
+      return
+    }
+    if (mode === 'draw') {
+      setDraftStroke({
+        id: createId('stroke'),
+        points: [canvasPoint(event)],
+        color: '#e4b46e',
+        width: 3,
+      })
+      return
+    }
+    if (mode === 'erase') {
+      eraseAt(canvasPoint(event))
+      return
+    }
+    setPanning(true)
+  }
+
+  function handleSurfacePointerMove(event: PointerEvent<HTMLDivElement>) {
+    if (!selectedBoard) return
+    if (draggingNodeId) {
+      const point = canvasPoint(event)
+      updateBoard(selectedBoard.id, (board) => ({
+        ...board,
+        nodes: board.nodes.map((node) =>
+          node.id === draggingNodeId ? { ...node, x: point.x, y: point.y } : node,
+        ),
+      }))
+      return
+    }
+    if (draftStroke) {
+      setDraftStroke({ ...draftStroke, points: [...draftStroke.points, canvasPoint(event)] })
+      return
+    }
+    if (mode === 'erase') {
+      eraseAt(canvasPoint(event))
+      return
+    }
+    if (panning) {
+      setPan((current) => ({ x: current.x + event.movementX, y: current.y + event.movementY }))
+    }
+  }
+
+  function handleSurfacePointerUp() {
+    if (selectedBoard && draftStroke && draftStroke.points.length > 1) {
+      updateBoard(selectedBoard.id, (board) => ({
+        ...board,
+        strokes: [...board.strokes, draftStroke],
+      }))
+    }
+    setDraggingNodeId(null)
+    setPanning(false)
+    setDraftStroke(null)
+  }
+
+  function handleNodePointerDown(event: PointerEvent<HTMLDivElement>, nodeId: string) {
+    event.stopPropagation()
+    if (!selectedBoard) return
+    if (mode === 'connect') {
+      if (!connectFromId) {
+        setConnectFromId(nodeId)
+        return
+      }
+      if (connectFromId !== nodeId) {
+        updateBoard(selectedBoard.id, (board) => ({
+          ...board,
+          edges: [
+            ...board.edges,
+            { id: createId('edge'), from: connectFromId, to: nodeId, label: t.lineText },
+          ],
+        }))
+      }
+      setConnectFromId(null)
+      return
+    }
+    setDraggingNodeId(nodeId)
+  }
+
+  function updateNodeText(nodeId: string, text: string) {
+    if (!selectedBoard) return
+    updateBoard(selectedBoard.id, (board) => ({
+      ...board,
+      nodes: board.nodes.map((node) => (node.id === nodeId ? { ...node, text } : node)),
+    }))
+  }
+
+  function updateEdgeLabel(edgeId: string, label: string) {
+    if (!selectedBoard) return
+    updateBoard(selectedBoard.id, (board) => ({
+      ...board,
+      edges: board.edges.map((edge) => (edge.id === edgeId ? { ...edge, label } : edge)),
+    }))
+  }
+
+  function importSketch(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file || !selectedBoard) return
+    const reader = new FileReader()
+    reader.onload = () => {
+      updateBoard(selectedBoard.id, (board) => ({
+        ...board,
+        images: [
+          ...board.images,
+          {
+            id: createId('image'),
+            x: 260,
+            y: 180,
+            width: 460,
+            height: 300,
+            dataUrl: String(reader.result),
+          },
+        ],
+      }))
+    }
+    reader.readAsDataURL(file)
+  }
+
+  async function exportBoardPdf() {
+    if (!selectedBoard) return
+    const { jsPDF } = await import('jspdf')
+    const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' })
+    const pageWidth = doc.internal.pageSize.getWidth()
+    const pageHeight = doc.internal.pageSize.getHeight()
+    doc.setFillColor(7, 19, 29)
+    doc.rect(0, 0, pageWidth, pageHeight, 'F')
+    doc.setTextColor(228, 180, 110)
+    doc.setFontSize(22)
+    doc.text(selectedBoard.title, 32, 38)
+
+    const allX = [
+      ...selectedBoard.nodes.map((node) => node.x),
+      ...selectedBoard.images.map((image) => image.x + image.width),
+      ...selectedBoard.strokes.flatMap((stroke) => stroke.points.map((point) => point.x)),
+    ]
+    const allY = [
+      ...selectedBoard.nodes.map((node) => node.y),
+      ...selectedBoard.images.map((image) => image.y + image.height),
+      ...selectedBoard.strokes.flatMap((stroke) => stroke.points.map((point) => point.y)),
+    ]
+    const minX = Math.min(0, ...allX) - 80
+    const minY = Math.min(0, ...allY) - 80
+    const maxX = Math.max(900, ...allX) + 160
+    const maxY = Math.max(620, ...allY) + 160
+    const scale = Math.min((pageWidth - 64) / (maxX - minX), (pageHeight - 90) / (maxY - minY))
+    const tx = (x: number) => 32 + (x - minX) * scale
+    const ty = (y: number) => 64 + (y - minY) * scale
+
+    selectedBoard.images.forEach((image) => {
+      doc.addImage(image.dataUrl, tx(image.x), ty(image.y), image.width * scale, image.height * scale)
+    })
+    doc.setDrawColor(184, 220, 255)
+    doc.setLineWidth(1)
+    selectedBoard.edges.forEach((edge) => {
+      const from = selectedBoard.nodes.find((node) => node.id === edge.from)
+      const to = selectedBoard.nodes.find((node) => node.id === edge.to)
+      if (!from || !to) return
+      doc.line(tx(from.x), ty(from.y), tx(to.x), ty(to.y))
+      doc.setTextColor(234, 223, 203)
+      doc.setFontSize(9)
+      doc.text(edge.label, tx((from.x + to.x) / 2), ty((from.y + to.y) / 2))
+    })
+    doc.setDrawColor(228, 180, 110)
+    selectedBoard.strokes.forEach((stroke) => {
+      doc.setLineWidth(stroke.width * scale)
+      stroke.points.slice(1).forEach((point, index) => {
+        const previous = stroke.points[index]
+        doc.line(tx(previous.x), ty(previous.y), tx(point.x), ty(point.y))
+      })
+    })
+    selectedBoard.nodes.forEach((node) => {
+      doc.setFillColor(232, 220, 199)
+      doc.circle(tx(node.x), ty(node.y), 5, 'F')
+      doc.setTextColor(234, 223, 203)
+      doc.setFontSize(10)
+      doc.text(node.text, tx(node.x) + 10, ty(node.y) - 8)
+    })
+    doc.save(`${safeMarkdownFilename(selectedBoard.title).replace(/\.md$/i, '')}.pdf`)
+  }
+
+  return (
+    <>
+      <div className="utility-heading whiteboard-heading">
+        <span>{t.whiteboardsEyebrow}</span>
+        <h1>{t.whiteboardsTitle}</h1>
+        <button type="button" onClick={createBoard}>
+          {t.newWhiteboard}
+        </button>
+      </div>
+      <div className="whiteboard-shell">
+        <aside className="whiteboard-list">
+          <label>
+            {t.searchWhiteboards}
+            <input
+              value={search}
+              placeholder={t.whiteboardPlaceholder}
+              onChange={(event) => setSearch(event.target.value)}
+            />
+          </label>
+          {filteredBoards.length > 0 ? (
+            filteredBoards.map((board) => (
+              <article className={board.id === selectedBoard?.id ? 'active' : ''} key={board.id}>
+                <input
+                  value={board.title}
+                  onChange={(event) =>
+                    updateBoard(board.id, (current) => ({ ...current, title: event.target.value }))
+                  }
+                />
+                <time>{new Date(board.updatedAt).toLocaleString(language === 'zh' ? 'zh-CN' : 'en-US')}</time>
+                <div>
+                  <button type="button" onClick={() => setSelectedBoardId(board.id)}>
+                    {t.open}
+                  </button>
+                  <button type="button" onClick={() => deleteBoard(board.id)}>
+                    {t.deleteWhiteboard}
+                  </button>
+                </div>
+              </article>
+            ))
+          ) : (
+            <p>{t.noWhiteboards}</p>
+          )}
+        </aside>
+        <section className="whiteboard-workspace">
+          <div className="whiteboard-toolbar">
+            {(['select', 'node', 'connect', 'draw', 'erase'] as WhiteboardMode[]).map((item) => (
+              <button
+                className={mode === item ? 'active' : ''}
+                key={item}
+                type="button"
+                onClick={() => setMode(item)}
+              >
+                {item === 'select'
+                  ? t.moveCanvas
+                  : item === 'node'
+                    ? t.addPoint
+                    : item === 'connect'
+                      ? t.connectPoints
+                      : item === 'draw'
+                        ? t.handDraw
+                        : t.eraseDrawings}
+              </button>
+            ))}
+            <button type="button" onClick={undoWhiteboardStep}>
+              {t.undoWhiteboard}
+            </button>
+            <button type="button" onClick={() => fileInputRef.current?.click()}>
+              {t.importSketch}
+            </button>
+            <button type="button" onClick={exportBoardPdf}>
+              {t.exportPdf}
+            </button>
+            <input
+              accept="image/png,image/jpeg"
+              hidden
+              ref={fileInputRef}
+              type="file"
+              onChange={importSketch}
+            />
+          </div>
+          <div
+            className={`whiteboard-canvas mode-${mode}`}
+            ref={boardSurfaceRef}
+            onPointerDown={handleSurfacePointerDown}
+            onPointerMove={handleSurfacePointerMove}
+            onPointerUp={handleSurfacePointerUp}
+            onPointerLeave={handleSurfacePointerUp}
+          >
+            <div className="whiteboard-stage" style={{ transform: `translate(${pan.x}px, ${pan.y}px)` }}>
+              {boardImages.map((image) => (
+                <img
+                  alt=""
+                  className="whiteboard-image"
+                  key={image.id}
+                  src={image.dataUrl}
+                  style={{ left: image.x, top: image.y, width: image.width, height: image.height }}
+                />
+              ))}
+              <svg className="whiteboard-lines" viewBox="0 0 2400 1600">
+                {boardEdges.map((edge) => {
+                  const from = boardNodes.find((node) => node.id === edge.from)
+                  const to = boardNodes.find((node) => node.id === edge.to)
+                  if (!from || !to) return null
+                  return <line key={edge.id} x1={from.x} x2={to.x} y1={from.y} y2={to.y} />
+                })}
+                {[...boardStrokes, ...(draftStroke ? [draftStroke] : [])].map((stroke) => (
+                  <polyline
+                    key={stroke.id}
+                    points={stroke.points.map((point) => `${point.x},${point.y}`).join(' ')}
+                  />
+                ))}
+              </svg>
+              {boardEdges.map((edge) => {
+                const from = boardNodes.find((node) => node.id === edge.from)
+                const to = boardNodes.find((node) => node.id === edge.to)
+                if (!from || !to) return null
+                return (
+                  <input
+                    className="edge-label"
+                    key={edge.id}
+                    style={{ left: (from.x + to.x) / 2, top: (from.y + to.y) / 2 }}
+                    value={edge.label}
+                    onPointerDown={(event) => event.stopPropagation()}
+                    onChange={(event) => updateEdgeLabel(edge.id, event.target.value)}
+                  />
+                )
+              })}
+              {boardNodes.map((node) => (
+                <div
+                  className={`whiteboard-node ${connectFromId === node.id ? 'connecting' : ''}`}
+                  key={node.id}
+                  style={{ left: node.x, top: node.y }}
+                  onContextMenu={(event) => {
+                    event.preventDefault()
+                    deleteNode(node.id)
+                  }}
+                  onPointerDown={(event) => handleNodePointerDown(event, node.id)}
+                >
+                  <span />
+                  <textarea
+                    value={node.text}
+                    onPointerDown={(event) => {
+                      if (mode !== 'connect') {
+                        event.stopPropagation()
+                      }
+                    }}
+                    onChange={(event) => updateNodeText(node.id, event.target.value)}
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
       </div>
     </>
   )
@@ -2113,20 +3018,28 @@ function SettingsView({
   fontSettings,
   fontNotice,
   language,
+  migrationNotice,
   selectedPiece,
+  onBackupNow,
   onCopyChange,
+  onExportMigration,
   onFontNoticeChange,
   onFontSettingsChange,
+  onRestoreBackup,
   onSelectedPieceChange,
 }: {
   appCopy: AppCopy
   fontSettings: FontSettings
   fontNotice: string
   language: Language
+  migrationNotice: string
   selectedPiece: WritingPiece
+  onBackupNow: () => void
   onCopyChange: Dispatch<SetStateAction<AppCopy>>
+  onExportMigration: () => void
   onFontNoticeChange: Dispatch<SetStateAction<string>>
   onFontSettingsChange: Dispatch<SetStateAction<FontSettings>>
+  onRestoreBackup: () => void
   onSelectedPieceChange: (update: Partial<WritingPiece>) => void
 }) {
   const t = uiText[language]
@@ -2266,6 +3179,21 @@ function SettingsView({
             }
           />
         </label>
+        <div className="settings-divider">
+          <span>{t.migrationTitle}</span>
+        </div>
+        <div className="migration-actions">
+          <button type="button" onClick={onBackupNow}>
+            {t.backupNow}
+          </button>
+          <button type="button" onClick={onRestoreBackup}>
+            {t.restoreBackup}
+          </button>
+          <button type="button" onClick={onExportMigration}>
+            {t.exportMigration}
+          </button>
+        </div>
+        {migrationNotice ? <p className="settings-note">{migrationNotice}</p> : null}
         <div className="settings-divider">
           <span>{t.typographyTitle}</span>
         </div>

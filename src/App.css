@@ -1272,6 +1272,12 @@ button {
   overflow: auto;
 }
 
+.utility-layout.whiteboard-utility {
+  grid-template-rows: auto minmax(0, 1fr);
+  align-content: stretch;
+  overflow: hidden;
+}
+
 .utility-heading {
   max-width: 720px;
 }
@@ -1390,6 +1396,252 @@ button {
 
 .notes-grid article.active {
   border-color: rgba(244, 200, 128, 0.8);
+}
+
+.whiteboard-heading {
+  grid-template-columns: 1fr auto;
+  align-items: end;
+}
+
+.whiteboard-heading button,
+.whiteboard-toolbar button,
+.whiteboard-list button {
+  min-height: 40px;
+  padding: 0 14px;
+  color: var(--ink);
+  background: rgba(224, 166, 89, 0.08);
+  border: 1px solid rgba(224, 166, 89, 0.22);
+  border-radius: 8px;
+}
+
+.whiteboard-heading h1 {
+  grid-column: 1;
+}
+
+.whiteboard-shell {
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 280px minmax(0, 1fr);
+  gap: 16px;
+}
+
+.whiteboard-list,
+.whiteboard-workspace {
+  min-height: 0;
+  color: var(--ink);
+  background: rgba(3, 12, 19, 0.7);
+  border: 1px solid rgba(224, 166, 89, 0.22);
+  border-radius: 8px;
+}
+
+.theme-day .whiteboard-list,
+.theme-day .whiteboard-workspace {
+  background:
+    linear-gradient(180deg, rgba(255, 253, 244, 0.74), rgba(239, 227, 199, 0.46)),
+    rgba(255, 250, 232, 0.58);
+  border-color: rgba(107, 82, 44, 0.22);
+}
+
+.whiteboard-list {
+  padding: 14px;
+  display: grid;
+  align-content: start;
+  gap: 12px;
+  overflow: auto;
+}
+
+.whiteboard-list label {
+  display: grid;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 12px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.whiteboard-list input {
+  width: 100%;
+  color: var(--ink);
+  background: rgba(255, 255, 255, 0.045);
+  border: 1px solid rgba(224, 166, 89, 0.2);
+  border-radius: 8px;
+  outline: 0;
+}
+
+.whiteboard-list label input {
+  padding: 10px 12px;
+}
+
+.whiteboard-list article {
+  padding: 12px;
+  display: grid;
+  gap: 8px;
+  border: 1px solid rgba(224, 166, 89, 0.16);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.whiteboard-list article.active {
+  border-color: rgba(244, 200, 128, 0.74);
+}
+
+.whiteboard-list article > input {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font-family: var(--serif);
+  font-size: 20px;
+  font-style: italic;
+}
+
+.whiteboard-list time {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.whiteboard-list article div {
+  display: flex;
+  gap: 8px;
+}
+
+.whiteboard-workspace {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  overflow: hidden;
+}
+
+.whiteboard-toolbar {
+  padding: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  border-bottom: 1px solid rgba(224, 166, 89, 0.16);
+}
+
+.whiteboard-toolbar button.active {
+  color: #160f08;
+  background: rgba(228, 180, 110, 0.92);
+}
+
+.whiteboard-canvas {
+  position: relative;
+  min-height: 0;
+  overflow: hidden;
+  cursor: grab;
+  background:
+    radial-gradient(circle at 50% 45%, rgba(184, 220, 255, 0.08), transparent 30rem),
+    linear-gradient(rgba(224, 166, 89, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(224, 166, 89, 0.05) 1px, transparent 1px);
+  background-size: auto, 44px 44px, 44px 44px;
+}
+
+.whiteboard-canvas.mode-node {
+  cursor: crosshair;
+}
+
+.whiteboard-canvas.mode-draw {
+  cursor: cell;
+}
+
+.whiteboard-canvas.mode-erase {
+  cursor: not-allowed;
+}
+
+.whiteboard-stage {
+  position: absolute;
+  inset: 0;
+  width: 2400px;
+  height: 1600px;
+  transform-origin: 0 0;
+}
+
+.whiteboard-lines {
+  position: absolute;
+  inset: 0;
+  width: 2400px;
+  height: 1600px;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.whiteboard-lines line {
+  stroke: rgba(184, 220, 255, 0.72);
+  stroke-width: 1.4;
+}
+
+.whiteboard-lines polyline {
+  fill: none;
+  stroke: rgba(228, 180, 110, 0.86);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 3;
+}
+
+.whiteboard-image {
+  position: absolute;
+  object-fit: contain;
+  border: 1px solid rgba(224, 166, 89, 0.24);
+  border-radius: 8px;
+  opacity: 0.86;
+  pointer-events: none;
+}
+
+.whiteboard-node {
+  position: absolute;
+  transform: translate(-10px, -10px);
+  display: grid;
+  grid-template-columns: 20px 180px;
+  gap: 8px;
+  align-items: start;
+  cursor: move;
+}
+
+.whiteboard-node > span {
+  width: 18px;
+  height: 18px;
+  margin-top: 10px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #fff8e9 0 12%, #e4b46e 42%, #6c5131 100%);
+  box-shadow:
+    0 0 14px rgba(228, 180, 110, 0.5),
+    0 0 26px rgba(184, 220, 255, 0.22);
+}
+
+.whiteboard-node.connecting > span {
+  background: radial-gradient(circle, #ffffff 0 16%, #b8dcff 46%, #416786 100%);
+}
+
+.whiteboard-node textarea,
+.edge-label {
+  color: var(--ink);
+  background: rgba(5, 13, 19, 0.48);
+  border: 1px solid rgba(224, 166, 89, 0.24);
+  border-radius: 8px;
+  outline: 0;
+  backdrop-filter: blur(16px);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.24);
+}
+
+.whiteboard-node textarea {
+  min-height: 58px;
+  padding: 10px 12px;
+  resize: both;
+}
+
+.edge-label {
+  position: absolute;
+  width: 160px;
+  min-height: 32px;
+  padding: 6px 9px;
+  transform: translate(-50%, -50%);
+  text-align: center;
+}
+
+.theme-day .whiteboard-node textarea,
+.theme-day .edge-label,
+.theme-day .whiteboard-list input {
+  background: rgba(255, 255, 255, 0.58);
+  border-color: rgba(82, 62, 34, 0.24);
 }
 
 .notes-grid small,
@@ -1595,6 +1847,26 @@ button {
   gap: 14px;
 }
 
+.migration-actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.migration-actions button {
+  min-height: 42px;
+  padding: 0 12px;
+  color: var(--ink);
+  background: rgba(224, 166, 89, 0.08);
+  border: 1px solid rgba(224, 166, 89, 0.22);
+  border-radius: 8px;
+}
+
+.theme-day .migration-actions button {
+  background: rgba(255, 247, 218, 0.62);
+  border-color: rgba(82, 62, 34, 0.24);
+}
+
 .imported-fonts-panel {
   display: grid;
   gap: 10px;
@@ -1683,6 +1955,7 @@ button {
   border-radius: 8px;
   font-size: 14px;
   letter-spacing: 0.04em;
+  overflow-wrap: anywhere;
 }
 
 .theme-day .settings-note {

@@ -1,7 +1,7 @@
 {
   "name": "zodiac-writing",
   "private": true,
-  "version": "0.1.4",
+  "version": "0.1.5",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "@tauri-apps/api": "^2.11.1",
+    "jspdf": "^4.2.1",
     "react": "^19.2.7",
     "react-dom": "^19.2.7"
   },
