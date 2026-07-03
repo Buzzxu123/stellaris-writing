@@ -1,5 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import type { CSSProperties, Dispatch, KeyboardEvent, MouseEvent, SetStateAction } from 'react'
+import type {
+  CSSProperties,
+  ChangeEvent,
+  Dispatch,
+  KeyboardEvent,
+  MouseEvent,
+  SetStateAction,
+} from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import './App.css'
 
@@ -8,6 +15,7 @@ type ViewMode = 'galaxy' | 'editor' | 'notes' | 'statistics' | 'calendar' | 'set
 type ParagraphMode = 'zh' | 'en' | 'none'
 type ThemeMode = 'auto' | 'day' | 'night'
 type ActiveTheme = 'day' | 'night'
+type Language = 'zh' | 'en'
 
 type ConstellationStar = {
   id: string
@@ -63,6 +71,19 @@ type AppCopy = {
   leftSlogan: string
   quote: string
   author: string
+}
+
+type FontImport = {
+  label: string
+  family: string
+  dataUrl: string
+}
+
+type FontSettings = {
+  zhFont: string
+  enFont: string
+  zhImports: FontImport[]
+  enImports: FontImport[]
 }
 
 const zodiacs: Zodiac[] = [
@@ -340,6 +361,190 @@ const zodiacMottos: Record<string, { archetype: string; traits: string }> = {
   pisces: { archetype: 'The Dreamer', traits: 'Porous · Poetic · Devoted' },
 }
 
+const zodiacMottosZh: Record<string, { archetype: string; traits: string }> = {
+  aries: { archetype: '开篇者', traits: '果敢 · 直接 · 不安于室' },
+  taurus: { archetype: '守护者', traits: '耐心 · 敏锐 · 稳定' },
+  gemini: { archetype: '传信者', traits: '好奇 · 轻盈 · 灵动' },
+  cancer: { archetype: '滋养者', traits: '直觉 · 守护 · 想象' },
+  leo: { archetype: '发光者', traits: '热烈 · 骄傲 · 慷慨' },
+  virgo: { archetype: '编织者', traits: '精确 · 温柔 · 有用' },
+  libra: { archetype: '调和者', traits: '优雅 · 公正 · 敏感' },
+  scorpio: { archetype: '深潜者', traits: '迷人 · 隐秘 · 蜕变' },
+  sagittarius: { archetype: '远行者', traits: '开阔 · 不羁 · 有盼望' },
+  capricorn: { archetype: '筑造者', traits: '耐心 · 克制 · 可靠' },
+  aquarius: { archetype: '远见者', traits: '清醒 · 独特 · 仁慈' },
+  pisces: { archetype: '梦游者', traits: '通透 · 诗意 · 投入' },
+}
+
+const uiText = {
+  zh: {
+    appSubtitle: '写作打卡',
+    navCheckIn: '打卡',
+    navNotes: '我的笔记',
+    navStats: '统计',
+    navCalendar: '日历',
+    navSettings: '设置',
+    weeklyCompass: '本周罗盘',
+    checkIns: '次打卡',
+    chooseConstellation: '选择一片星座',
+    focusWords: '让文字有处停靠。',
+    autoTheme: '自动',
+    dayMode: '日间模式',
+    nightMode: '夜间模式',
+    day: '白昼',
+    night: '黑夜',
+    linkedNote: '关联笔记',
+    lit: '已点亮',
+    inProgress: '写作中',
+    novelProject: '长篇项目',
+    wordsUnit: '字',
+    startWriting: '开始写作',
+    copyToClipboard: '复制全文',
+    copiedToClipboard: '已复制',
+    copyIdle: '复制',
+    saveMarkdown: '保存 Markdown',
+    savedMarkdown: '已保存 Markdown',
+    downloadedMarkdown: '已下载 Markdown',
+    language: '语言',
+    currentLanguage: '中文',
+    backToWheel: '返回星图',
+    lastOrbit: '上次停泊',
+    indentMode: '段落缩进',
+    chinese: '中文',
+    english: '英文',
+    noIndent: '不缩进',
+    chars: '字符',
+    page: '第',
+    pageSuffix: '页',
+    previousPage: '上一页',
+    nextPage: '下一页',
+    starAnchors: '星标锚点',
+    setAnchor: '设为锚点',
+    save: '保存',
+    cancel: '取消',
+    close: '关闭',
+    index: '位置',
+    dockingQuestion: '此刻星轨的尽头是？',
+    leave: '离开',
+    notesEyebrow: '□ 我的笔记',
+    notesTitle: '所有关联写作',
+    searchByTitle: '按标题搜索',
+    searchPlaceholder: '输入标题关键词...',
+    notesCount: '篇笔记',
+    modified: '更新于',
+    open: '打开',
+    statsEyebrow: '▥ 统计',
+    statsTitle: '写作星图概览',
+    totalWords: '累计字数',
+    litStars: '已点亮星点',
+    completion: '完成度',
+    activeNotes: '有内容的笔记',
+    calendarEyebrow: '☽ 日历',
+    calendarTitleSuffix: '写作记录',
+    calendarWords: '字',
+    settingsEyebrow: '⚙ 设置',
+    settingsTitle: '写作系统设置',
+    noteTarget: '当前笔记目标字数',
+    leftQuote: '左侧语录',
+    leftQuoteAuthor: '左侧语录作者',
+    typographyTitle: '字体',
+    chineseFont: '中文字体',
+    englishFont: '英文字体',
+    importChineseFont: '导入中文字体',
+    importEnglishFont: '导入英文字体',
+  },
+  en: {
+    appSubtitle: 'WRITING CHECK-IN',
+    navCheckIn: 'Check-In',
+    navNotes: 'My Notes',
+    navStats: 'Statistics',
+    navCalendar: 'Calendar',
+    navSettings: 'Settings',
+    weeklyCompass: 'Weekly Compass',
+    checkIns: 'Check-Ins',
+    chooseConstellation: 'Choose a constellation',
+    focusWords: 'to focus your words.',
+    autoTheme: 'Auto',
+    dayMode: 'Day Mode',
+    nightMode: 'Night Mode',
+    day: 'Day',
+    night: 'Night',
+    linkedNote: 'Linked Note',
+    lit: 'Lit',
+    inProgress: 'In Progress',
+    novelProject: 'Novel Project',
+    wordsUnit: 'WORDS',
+    startWriting: 'Start Writing',
+    copyToClipboard: 'Copy to Clipboard',
+    copiedToClipboard: 'Copied to Clipboard',
+    copyIdle: 'Copy',
+    saveMarkdown: 'Save Markdown',
+    savedMarkdown: 'Saved Markdown',
+    downloadedMarkdown: 'Downloaded Markdown',
+    language: 'Language',
+    currentLanguage: 'English',
+    backToWheel: 'Back to Wheel',
+    lastOrbit: 'Last orbit',
+    indentMode: 'Paragraph indentation mode',
+    chinese: 'Chinese',
+    english: 'English',
+    noIndent: 'No Indent',
+    chars: 'chars',
+    page: 'Page',
+    pageSuffix: '',
+    previousPage: 'Previous Page',
+    nextPage: 'Next Page',
+    starAnchors: 'Star anchors',
+    setAnchor: 'Set anchor',
+    save: 'Save',
+    cancel: 'Cancel',
+    close: 'Close',
+    index: 'Index',
+    dockingQuestion: '此刻星轨的尽头是？',
+    leave: 'Leave',
+    notesEyebrow: '□ My Notes',
+    notesTitle: 'Linked writing pieces',
+    searchByTitle: 'Search by title',
+    searchPlaceholder: 'Type a title...',
+    notesCount: 'notes',
+    modified: 'Modified',
+    open: 'Open',
+    statsEyebrow: '▥ Statistics',
+    statsTitle: 'Writing constellation health',
+    totalWords: 'Total Words',
+    litStars: 'Lit Stars',
+    completion: 'Completion',
+    activeNotes: 'Active Notes',
+    calendarEyebrow: '☽ Calendar',
+    calendarTitleSuffix: 'writing log',
+    calendarWords: 'words',
+    settingsEyebrow: '⚙ Settings',
+    settingsTitle: 'Writing system controls',
+    noteTarget: 'Current note target',
+    leftQuote: 'Left quote',
+    leftQuoteAuthor: 'Left quote author',
+    typographyTitle: 'Typography',
+    chineseFont: 'Chinese font',
+    englishFont: 'English font',
+    importChineseFont: 'Import Chinese font',
+    importEnglishFont: 'Import English font',
+  },
+} satisfies Record<Language, Record<string, string>>
+
+const zhFontPresets = [
+  { label: '宋体雅致', value: "'Songti SC', 'Noto Serif CJK SC', serif" },
+  { label: '苹方清朗', value: "'PingFang SC', 'Hiragino Sans GB', sans-serif" },
+  { label: '楷体手稿', value: "'Kaiti SC', 'STKaiti', serif" },
+  { label: '华文宋体', value: "'STSong', 'Songti SC', serif" },
+]
+
+const enFontPresets = [
+  { label: 'Iowan Old Style', value: "'Iowan Old Style', Georgia, serif" },
+  { label: 'Baskerville', value: "Baskerville, 'Baskerville Old Face', serif" },
+  { label: 'Didot', value: "Didot, 'Bodoni 72', serif" },
+  { label: 'Avenir', value: "'Avenir Next', 'Helvetica Neue', sans-serif" },
+]
+
 const titleSeed = 'Tides Remember What We Forget'
 const draftSeed =
   'The tide remembers what the shore pretends to release, and every return leaves a brighter mark inside the dark.'
@@ -356,6 +561,8 @@ function buildPreviewDraft() {
 const storageKey = 'zodiac-writing-pieces-v2'
 const copyStorageKey = 'zodiac-writing-copy-v1'
 const themeStorageKey = 'zodiac-writing-theme-v1'
+const languageStorageKey = 'zodiac-writing-language-v1'
+const fontStorageKey = 'zodiac-writing-fonts-v1'
 const editorPageSize = 1800
 const initialUpdatedAt = '2026-06-30T00:00:00.000Z'
 
@@ -363,6 +570,38 @@ const defaultCopy: AppCopy = {
   leftSlogan: "The stars don't write for you.\nThey remind you why you do.",
   quote: 'Your words are the stars\nyou bring into being.',
   author: 'Anais Nin',
+}
+
+const defaultFontSettings: FontSettings = {
+  zhFont: zhFontPresets[0].value,
+  enFont: enFontPresets[0].value,
+  zhImports: [],
+  enImports: [],
+}
+
+function normalizeFontSettings(value: Partial<FontSettings> | null): FontSettings {
+  return {
+    ...defaultFontSettings,
+    ...value,
+    zhImports: value?.zhImports ?? [],
+    enImports: value?.enImports ?? [],
+  }
+}
+
+function fontOptionKey(value: string) {
+  return value.replace(/[^a-zA-Z0-9_-]/g, '-')
+}
+
+function customFontCss(settings: FontSettings) {
+  return [...settings.zhImports, ...settings.enImports]
+    .map(
+      (font) => `@font-face {
+  font-family: "${font.family}";
+  src: url("${font.dataUrl}");
+  font-display: swap;
+}`,
+    )
+    .join('\n')
 }
 
 function createInitialPieces() {
@@ -629,9 +868,17 @@ function App() {
   const [anchorPreview, setAnchorPreview] = useState<StarAnchor | null>(null)
   const writingSurfaceRef = useRef<HTMLTextAreaElement>(null)
   const [now, setNow] = useState(() => new Date())
+  const [language, setLanguage] = useState<Language>(() => {
+    const saved = window.localStorage.getItem(languageStorageKey)
+    return saved === 'en' ? 'en' : 'zh'
+  })
   const [themeMode, setThemeMode] = useState<ThemeMode>(() => {
     const saved = window.localStorage.getItem(themeStorageKey)
     return saved === 'day' || saved === 'night' || saved === 'auto' ? saved : 'auto'
+  })
+  const [fontSettings, setFontSettings] = useState<FontSettings>(() => {
+    const saved = window.localStorage.getItem(fontStorageKey)
+    return normalizeFontSettings(saved ? JSON.parse(saved) : null)
   })
   const [appCopy, setAppCopy] = useState<AppCopy>(() => {
     const saved = window.localStorage.getItem(copyStorageKey)
@@ -657,6 +904,13 @@ function App() {
   const selectedPiece = pieces[`${selectedZodiac.id}-${selectedStar.id}`]
   const selectedStats = countWriting(selectedPiece.content)
   const activeTheme = themeMode === 'auto' ? getAutoTheme(now) : themeMode
+  const t = uiText[language]
+  const activeMottos = language === 'zh' ? zodiacMottosZh : zodiacMottos
+  const activeFontCss = useMemo(() => customFontCss(fontSettings), [fontSettings])
+  const appStyle = {
+    '--font-zh': fontSettings.zhFont,
+    '--font-en': fontSettings.enFont,
+  } as CSSProperties
   const editorPages = splitIntoPages(selectedPiece.content)
   const currentEditorPage = Math.min(editorPage, editorPages.length - 1)
   const currentEditorText = editorPages[currentEditorPage] ?? ''
@@ -696,6 +950,14 @@ function App() {
   useEffect(() => {
     window.localStorage.setItem(themeStorageKey, themeMode)
   }, [themeMode])
+
+  useEffect(() => {
+    window.localStorage.setItem(languageStorageKey, language)
+  }, [language])
+
+  useEffect(() => {
+    window.localStorage.setItem(fontStorageKey, JSON.stringify(fontSettings))
+  }, [fontSettings])
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(new Date()), 1000)
@@ -905,13 +1167,14 @@ function App() {
   }
 
   return (
-    <main className={`app-shell theme-${activeTheme}`}>
+    <main className={`app-shell theme-${activeTheme} language-${language}`} style={appStyle}>
+      {activeFontCss ? <style>{activeFontCss}</style> : null}
       <aside className="sidebar" aria-label="App navigation">
         <button className="brand" type="button" onClick={() => navigateTo('galaxy')}>
           <span className="brand-mark">✦</span>
           <span>
             <strong>STELLARIS</strong>
-            <small>WRITING CHECK-IN</small>
+            <small>{t.appSubtitle}</small>
           </span>
         </button>
         <nav className="side-nav" aria-label="Primary views">
@@ -921,7 +1184,7 @@ function App() {
             onClick={() => navigateTo('galaxy')}
           >
             <span>✦</span>
-            Check-In
+            {t.navCheckIn}
           </button>
           <button
             className={viewMode === 'notes' || viewMode === 'editor' ? 'active' : ''}
@@ -929,7 +1192,7 @@ function App() {
             onClick={() => navigateTo('notes')}
           >
             <span>□</span>
-            My Notes
+            {t.navNotes}
           </button>
           <button
             className={viewMode === 'statistics' ? 'active' : ''}
@@ -937,7 +1200,7 @@ function App() {
             onClick={() => navigateTo('statistics')}
           >
             <span>▥</span>
-            Statistics
+            {t.navStats}
           </button>
           <button
             className={viewMode === 'calendar' ? 'active' : ''}
@@ -945,7 +1208,7 @@ function App() {
             onClick={() => navigateTo('calendar')}
           >
             <span>☽</span>
-            Calendar
+            {t.navCalendar}
           </button>
           <button
             className={viewMode === 'settings' ? 'active' : ''}
@@ -953,7 +1216,7 @@ function App() {
             onClick={() => navigateTo('settings')}
           >
             <span>⚙</span>
-            Settings
+            {t.navSettings}
           </button>
         </nav>
         <div className="sidebar-card moon-card">
@@ -962,8 +1225,8 @@ function App() {
           <small>- {appCopy.author}</small>
         </div>
         <div className="sidebar-card compact-card">
-          <strong>Weekly Compass</strong>
-          <span>{totalProgress.lit} / 7 Check-Ins</span>
+          <strong>{t.weeklyCompass}</strong>
+          <span>{totalProgress.lit} / 7 {t.checkIns}</span>
           <div>
             <i style={{ width: `${totalProgress.percent}%` }} />
           </div>
@@ -973,8 +1236,8 @@ function App() {
       <section className="workspace">
         <header className="topbar">
           <div>
-            <p>Choose a constellation</p>
-            <h2>to focus your words.</h2>
+            <p>{t.chooseConstellation}</p>
+            <h2>{t.focusWords}</h2>
           </div>
           <div className="time-theme-cluster">
             <time dateTime={now.toISOString()}>{formatClock(now)}</time>
@@ -988,10 +1251,10 @@ function App() {
               }
             >
               {themeMode === 'auto'
-                ? `Auto · ${activeTheme === 'day' ? 'Day' : 'Night'}`
+                ? `${t.autoTheme} · ${activeTheme === 'day' ? t.day : t.night}`
                 : themeMode === 'day'
-                  ? '☉ Day Mode'
-                  : '◐ Night Mode'}
+                  ? `☉ ${t.dayMode}`
+                  : `◐ ${t.nightMode}`}
             </button>
           </div>
         </header>
@@ -1074,7 +1337,9 @@ function App() {
                         )
                       })}
                     </svg>
-                    <strong>{zodiac.latin.toUpperCase()}</strong>
+                    <strong>
+                      {language === 'zh' ? zodiac.name : zodiac.latin.toUpperCase()}
+                    </strong>
                     <small>
                       {progress?.lit ?? 0}/{progress?.total ?? 0}
                     </small>
@@ -1086,11 +1351,15 @@ function App() {
               <span className="focused-symbol">{textSymbol(selectedZodiac.symbol)}</span>
               <div className="section-heading">
                 <div>
-                  <h1 id="constellation-title">{selectedZodiac.latin.toUpperCase()}</h1>
+                  <h1 id="constellation-title">
+                    {language === 'zh' ? selectedZodiac.name : selectedZodiac.latin.toUpperCase()}
+                  </h1>
                   <p>
-                    {zodiacMottos[selectedZodiac.id].archetype.toUpperCase()}
+                    {language === 'zh'
+                      ? activeMottos[selectedZodiac.id].archetype
+                      : activeMottos[selectedZodiac.id].archetype.toUpperCase()}
                   </p>
-                  <small>{zodiacMottos[selectedZodiac.id].traits}</small>
+                  <small>{activeMottos[selectedZodiac.id].traits}</small>
                 </div>
               </div>
 
@@ -1171,16 +1440,16 @@ function App() {
           <aside className="status-column" aria-label="Writing status">
             <section className="note-panel">
               <div>
-                <small className="linked-note">▣ Linked Note</small>
+                <small className="linked-note">▣ {t.linkedNote}</small>
                 <span className={`status-pill ${getStarState(selectedStar.id)}`}>
-                  {getStarState(selectedStar.id) === 'lit' ? 'Lit' : 'In Progress'}
+                  {getStarState(selectedStar.id) === 'lit' ? t.lit : t.inProgress}
                 </span>
                 <h2>{selectedPiece.title}</h2>
-                <p>Novel Project</p>
+                <p>{t.novelProject}</p>
               </div>
               <div className="metric">
                 <strong>{formatNumber(selectedStats.effective)}</strong>
-                <span>/ {formatNumber(selectedPiece.target)} WORDS</span>
+                <span>/ {formatNumber(selectedPiece.target)} {t.wordsUnit}</span>
               </div>
               <div className="meter">
                 <i
@@ -1193,13 +1462,25 @@ function App() {
                 />
               </div>
               <button className="primary-action" type="button" onClick={() => navigateTo('editor')}>
-                Start Writing
+                {t.startWriting}
               </button>
               <button className="secondary-action" type="button" onClick={copyPiece}>
-                {copyState === 'Copied' ? 'Copied to Clipboard' : 'Copy to Clipboard'}
+                {copyState === 'Copied' ? t.copiedToClipboard : t.copyToClipboard}
               </button>
               <button className="secondary-action" type="button" onClick={savePieceAsMarkdown}>
-                {saveState.startsWith('Saved') ? 'Saved Markdown' : saveState}
+                {saveState.startsWith('Saved')
+                  ? t.savedMarkdown
+                  : saveState === 'Downloaded Markdown'
+                    ? t.downloadedMarkdown
+                    : t.saveMarkdown}
+              </button>
+              <button
+                className="language-toggle"
+                type="button"
+                onClick={() => setLanguage((current) => (current === 'zh' ? 'en' : 'zh'))}
+              >
+                <span>{t.language}</span>
+                <strong>{t.currentLanguage}</strong>
               </button>
             </section>
           </aside>
@@ -1208,7 +1489,7 @@ function App() {
         <section className="editor-layout" aria-label="Writing editor">
           <div className="editor-meta">
             <button type="button" onClick={() => navigateTo('galaxy')}>
-              Back to Wheel
+              {t.backToWheel}
             </button>
             <div>
               <span>{selectedZodiac.latin} / {selectedStar.label}</span>
@@ -1221,14 +1502,14 @@ function App() {
           </div>
 
           {selectedPiece.dockLog ? (
-            <aside className="dock-log-banner" aria-label="Last docking log">
-              <span>Last orbit</span>
+            <aside className="dock-log-banner" aria-label={t.lastOrbit}>
+              <span>{t.lastOrbit}</span>
               <p>{selectedPiece.dockLog}</p>
             </aside>
           ) : null}
 
           <div className="editor-tools">
-            <div className="segmented-control" aria-label="Paragraph indentation mode">
+            <div className="segmented-control" aria-label={t.indentMode}>
               {(['zh', 'en', 'none'] as ParagraphMode[]).map((mode) => (
                 <button
                   className={selectedPiece.paragraphMode === mode ? 'active' : ''}
@@ -1236,22 +1517,22 @@ function App() {
                   type="button"
                   onClick={() => updateSelectedPiece({ paragraphMode: mode })}
                 >
-                  {mode === 'zh' ? 'Chinese' : mode === 'en' ? 'English' : 'No Indent'}
+                  {mode === 'zh' ? t.chinese : mode === 'en' ? t.english : t.noIndent}
                 </button>
               ))}
             </div>
             <div className="editor-counts">
-              <span>{formatNumber(selectedStats.characters)} chars</span>
-              <span>{formatNumber(selectedStats.words)} words</span>
+              <span>{formatNumber(selectedStats.characters)} {t.chars}</span>
+              <span>{formatNumber(selectedStats.words)} {t.wordsUnit.toLowerCase()}</span>
               <strong>
                 {formatNumber(selectedStats.effective)}/{formatNumber(selectedPiece.target)}
               </strong>
             </div>
             <button className="copy-button" type="button" onClick={copyPiece}>
-              {copyState}
+              {copyState === 'Copied' ? t.copiedToClipboard : t.copyIdle}
             </button>
             <button className="copy-button" type="button" onClick={savePieceAsMarkdown}>
-              {saveState.startsWith('Saved') ? 'Saved MD' : 'Save MD'}
+              {saveState.startsWith('Saved') ? t.savedMarkdown : t.saveMarkdown}
             </button>
           </div>
 
@@ -1261,10 +1542,12 @@ function App() {
               disabled={currentEditorPage === 0}
               onClick={() => setEditorPage((page) => Math.max(0, page - 1))}
             >
-              Previous Page
+              {t.previousPage}
             </button>
             <span>
-              Page {currentEditorPage + 1} / {editorPages.length}
+              {language === 'zh'
+                ? `${t.page}${currentEditorPage + 1} / ${editorPages.length}${t.pageSuffix}`
+                : `${t.page} ${currentEditorPage + 1} / ${editorPages.length}`}
             </span>
             <button
               type="button"
@@ -1273,7 +1556,7 @@ function App() {
                 setEditorPage((page) => Math.min(editorPages.length - 1, page + 1))
               }
             >
-              Next Page
+              {t.nextPage}
             </button>
           </div>
 
@@ -1287,8 +1570,8 @@ function App() {
             value={currentEditorText}
           />
           {selectedPiece.anchors.length > 0 ? (
-            <div className="anchor-index" aria-label="Star anchors">
-              <span>Star anchors</span>
+            <div className="anchor-index" aria-label={t.starAnchors}>
+              <span>{t.starAnchors}</span>
               <div>
                 {selectedPiece.anchors.map((anchor) => (
                   <button key={anchor.id} type="button" onClick={() => previewAnchor(anchor)}>
@@ -1308,7 +1591,7 @@ function App() {
                 top: anchorDraft.y,
               }}
             >
-              <span>Set anchor</span>
+              <span>{t.setAnchor}</span>
               <input
                 aria-label="Anchor tag"
                 autoFocus
@@ -1326,10 +1609,10 @@ function App() {
               />
               <div>
                 <button type="button" onClick={createAnchor}>
-                  Save
+                  {t.save}
                 </button>
                 <button type="button" onClick={() => setAnchorDraft(null)}>
-                  Cancel
+                  {t.cancel}
                 </button>
               </div>
             </div>
@@ -1338,12 +1621,12 @@ function App() {
           {anchorPreview ? (
             <div className="anchor-preview" role="dialog" aria-label="Anchor preview">
               <button type="button" onClick={() => setAnchorPreview(null)}>
-                Close
+                {t.close}
               </button>
               <span>{anchorPreview.tag}</span>
               <p>{anchorPreviewText}</p>
               <small>
-                Index {anchorPreview.start} - {anchorPreview.end}
+                {t.index} {anchorPreview.start} - {anchorPreview.end}
               </small>
             </div>
           ) : null}
@@ -1354,6 +1637,7 @@ function App() {
             <NotesView
               onTitleChange={(pieceId, title) => updatePiece(pieceId, { title })}
               pieces={pieces}
+              language={language}
               selectedPieceId={selectedPiece.id}
               onOpen={(piece) => {
                 const zodiacIndex = zodiacs.findIndex(
@@ -1366,14 +1650,17 @@ function App() {
             />
           ) : null}
           {viewMode === 'statistics' ? (
-            <StatisticsView pieces={pieces} totalProgress={totalProgress} />
+            <StatisticsView language={language} pieces={pieces} totalProgress={totalProgress} />
           ) : null}
-          {viewMode === 'calendar' ? <CalendarView pieces={pieces} /> : null}
+          {viewMode === 'calendar' ? <CalendarView language={language} pieces={pieces} /> : null}
           {viewMode === 'settings' ? (
             <SettingsView
               appCopy={appCopy}
+              fontSettings={fontSettings}
+              language={language}
               selectedPiece={selectedPiece}
               onCopyChange={setAppCopy}
+              onFontSettingsChange={setFontSettings}
               onSelectedPieceChange={updateSelectedPiece}
             />
           ) : null}
@@ -1388,7 +1675,7 @@ function App() {
               submitDockLog()
             }}
           >
-            <span>此刻星轨的尽头是？</span>
+            <span>{t.dockingQuestion}</span>
             <input
               aria-label="Docking log"
               autoFocus
@@ -1396,7 +1683,7 @@ function App() {
               value={dockLogDraft}
               onChange={(event) => setDockLogDraft(event.target.value)}
             />
-            <button type="submit">Leave</button>
+            <button type="submit">{t.leave}</button>
           </form>
         </div>
       ) : null}
@@ -1405,16 +1692,19 @@ function App() {
 }
 
 function NotesView({
+  language,
   onTitleChange,
   pieces,
   selectedPieceId,
   onOpen,
 }: {
+  language: Language
   onTitleChange: (pieceId: string, title: string) => void
   pieces: Record<string, WritingPiece>
   selectedPieceId: string
   onOpen: (piece: WritingPiece) => void
 }) {
+  const t = uiText[language]
   const [query, setQuery] = useState('')
   const normalizedQuery = query.trim().toLowerCase()
   const noteList = Object.values(pieces)
@@ -1424,31 +1714,34 @@ function NotesView({
   return (
     <>
       <div className="utility-heading">
-        <span>□ My Notes</span>
-        <h1>Linked writing pieces</h1>
+        <span>{t.notesEyebrow}</span>
+        <h1>{t.notesTitle}</h1>
       </div>
       <div className="notes-search">
         <label>
-          Search by title
+          {t.searchByTitle}
           <input
-            aria-label="Search notes by title"
-            placeholder="Type a title..."
+            aria-label={t.searchByTitle}
+            placeholder={t.searchPlaceholder}
             value={query}
             onChange={(event) => setQuery(event.target.value)}
           />
         </label>
-        <span>{noteList.length} notes</span>
+        <span>{noteList.length} {t.notesCount}</span>
       </div>
       <div className="notes-grid">
         {noteList.map((piece) => {
           const stats = countWriting(piece.content)
           const zodiac = zodiacs.find((item) => item.id === piece.zodiacId)
-          const updatedAt = new Date(piece.updatedAt).toLocaleString('en-US', {
+          const updatedAt = new Date(piece.updatedAt).toLocaleString(
+            language === 'zh' ? 'zh-CN' : 'en-US',
+            {
             month: 'short',
             day: '2-digit',
             hour: '2-digit',
             minute: '2-digit',
-          })
+            },
+          )
 
           return (
             <article
@@ -1461,10 +1754,10 @@ function NotesView({
                 value={piece.title}
                 onChange={(event) => onTitleChange(piece.id, event.target.value)}
               />
-              <span>{formatNumber(stats.effective)} / {formatNumber(piece.target)} words</span>
-              <time dateTime={piece.updatedAt}>Modified {updatedAt}</time>
+              <span>{formatNumber(stats.effective)} / {formatNumber(piece.target)} {t.wordsUnit.toLowerCase()}</span>
+              <time dateTime={piece.updatedAt}>{t.modified} {updatedAt}</time>
               <button type="button" onClick={() => onOpen(piece)}>
-                Open
+                {t.open}
               </button>
             </article>
           )
@@ -1475,12 +1768,15 @@ function NotesView({
 }
 
 function StatisticsView({
+  language,
   pieces,
   totalProgress,
 }: {
+  language: Language
   pieces: Record<string, WritingPiece>
   totalProgress: { lit: number; total: number; percent: number }
 }) {
+  const t = uiText[language]
   const allPieces = Object.values(pieces)
   const totalWords = allPieces.reduce(
     (sum, piece) => sum + countWriting(piece.content).effective,
@@ -1491,24 +1787,24 @@ function StatisticsView({
   return (
     <>
       <div className="utility-heading">
-        <span>▥ Statistics</span>
-        <h1>Writing constellation health</h1>
+        <span>{t.statsEyebrow}</span>
+        <h1>{t.statsTitle}</h1>
       </div>
       <div className="stat-grid">
         <article>
-          <span>Total Words</span>
+          <span>{t.totalWords}</span>
           <strong>{formatNumber(totalWords)}</strong>
         </article>
         <article>
-          <span>Lit Stars</span>
+          <span>{t.litStars}</span>
           <strong>{totalProgress.lit}/{totalProgress.total}</strong>
         </article>
         <article>
-          <span>Completion</span>
+          <span>{t.completion}</span>
           <strong>{totalProgress.percent}%</strong>
         </article>
         <article>
-          <span>Active Notes</span>
+          <span>{t.activeNotes}</span>
           <strong>{activeNotes}</strong>
         </article>
       </div>
@@ -1516,11 +1812,18 @@ function StatisticsView({
   )
 }
 
-function CalendarView({ pieces }: { pieces: Record<string, WritingPiece> }) {
+function CalendarView({
+  language,
+  pieces,
+}: {
+  language: Language
+  pieces: Record<string, WritingPiece>
+}) {
+  const t = uiText[language]
   const today = new Date()
   const year = today.getFullYear()
   const month = today.getMonth()
-  const monthName = today.toLocaleDateString('en-US', {
+  const monthName = today.toLocaleDateString(language === 'zh' ? 'zh-CN' : 'en-US', {
     month: 'long',
     year: 'numeric',
   })
@@ -1564,11 +1867,14 @@ function CalendarView({ pieces }: { pieces: Record<string, WritingPiece> }) {
   return (
     <>
       <div className="utility-heading">
-        <span>☽ Calendar</span>
-        <h1>{monthName} writing log</h1>
+        <span>{t.calendarEyebrow}</span>
+        <h1>{monthName} {t.calendarTitleSuffix}</h1>
       </div>
       <div className="calendar-month">
-        {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day) => (
+        {(language === 'zh'
+          ? ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
+          : ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+        ).map((day) => (
           <strong className="weekday" key={day}>
             {day}
           </strong>
@@ -1586,7 +1892,7 @@ function CalendarView({ pieces }: { pieces: Record<string, WritingPiece> }) {
                     const zodiac = zodiacs.find((item) => item.id === zodiacId)
 
                     return zodiac ? (
-                      <b key={zodiacId} title={`${zodiac.latin} lit`}>
+                      <b key={zodiacId} title={`${language === 'zh' ? zodiac.name : zodiac.latin} ${t.lit}`}>
                         {textSymbol(zodiac.symbol)}
                       </b>
                     ) : null
@@ -1594,7 +1900,7 @@ function CalendarView({ pieces }: { pieces: Record<string, WritingPiece> }) {
                 </div>
               ) : null}
               <strong>{formatNumber(cell.words)}</strong>
-              <small>words</small>
+              <small>{t.calendarWords}</small>
             </article>
           ) : (
             <i aria-hidden="true" key={`blank-${index}`} />
@@ -1607,24 +1913,73 @@ function CalendarView({ pieces }: { pieces: Record<string, WritingPiece> }) {
 
 function SettingsView({
   appCopy,
+  fontSettings,
+  language,
   selectedPiece,
   onCopyChange,
+  onFontSettingsChange,
   onSelectedPieceChange,
 }: {
   appCopy: AppCopy
+  fontSettings: FontSettings
+  language: Language
   selectedPiece: WritingPiece
   onCopyChange: Dispatch<SetStateAction<AppCopy>>
+  onFontSettingsChange: Dispatch<SetStateAction<FontSettings>>
   onSelectedPieceChange: (update: Partial<WritingPiece>) => void
 }) {
+  const t = uiText[language]
+  const zhOptions = [
+    ...zhFontPresets,
+    ...fontSettings.zhImports.map((font) => ({
+      label: font.label,
+      value: `"${font.family}"`,
+    })),
+  ]
+  const enOptions = [
+    ...enFontPresets,
+    ...fontSettings.enImports.map((font) => ({
+      label: font.label,
+      value: `"${font.family}"`,
+    })),
+  ]
+
+  function importFont(event: ChangeEvent<HTMLInputElement>, kind: 'zh' | 'en') {
+    const file = event.target.files?.[0]
+
+    if (!file) {
+      return
+    }
+
+    const reader = new FileReader()
+    reader.onload = () => {
+      const family = `Stellaris-${kind}-${Date.now()}`
+      const font = {
+        label: file.name.replace(/\.[^.]+$/, ''),
+        family,
+        dataUrl: String(reader.result),
+      }
+
+      onFontSettingsChange((current) => ({
+        ...current,
+        ...(kind === 'zh'
+          ? { zhFont: `"${family}"`, zhImports: [...current.zhImports, font] }
+          : { enFont: `"${family}"`, enImports: [...current.enImports, font] }),
+      }))
+    }
+    reader.readAsDataURL(file)
+    event.target.value = ''
+  }
+
   return (
     <>
       <div className="utility-heading">
-        <span>⚙ Settings</span>
-        <h1>Writing system controls</h1>
+        <span>{t.settingsEyebrow}</span>
+        <h1>{t.settingsTitle}</h1>
       </div>
       <div className="settings-panel">
         <label>
-          Current note target
+          {t.noteTarget}
           <input
             min="100"
             step="100"
@@ -1636,7 +1991,7 @@ function SettingsView({
           />
         </label>
         <label>
-          Left quote
+          {t.leftQuote}
           <textarea
             value={appCopy.quote}
             onChange={(event) =>
@@ -1648,7 +2003,7 @@ function SettingsView({
           />
         </label>
         <label>
-          Left quote author
+          {t.leftQuoteAuthor}
           <input
             value={appCopy.author}
             onChange={(event) =>
@@ -1659,6 +2014,63 @@ function SettingsView({
             }
           />
         </label>
+        <div className="settings-divider">
+          <span>{t.typographyTitle}</span>
+        </div>
+        <label>
+          {t.chineseFont}
+          <select
+            value={fontSettings.zhFont}
+            onChange={(event) =>
+              onFontSettingsChange((current) => ({
+                ...current,
+                zhFont: event.target.value,
+              }))
+            }
+          >
+            {zhOptions.map((font) => (
+              <option key={fontOptionKey(font.value)} value={font.value}>
+                {font.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          {t.englishFont}
+          <select
+            value={fontSettings.enFont}
+            onChange={(event) =>
+              onFontSettingsChange((current) => ({
+                ...current,
+                enFont: event.target.value,
+              }))
+            }
+          >
+            {enOptions.map((font) => (
+              <option key={fontOptionKey(font.value)} value={font.value}>
+                {font.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <div className="font-import-row">
+          <label>
+            {t.importChineseFont}
+            <input
+              accept=".otf,.ttf,.woff,.woff2,font/*"
+              type="file"
+              onChange={(event) => importFont(event, 'zh')}
+            />
+          </label>
+          <label>
+            {t.importEnglishFont}
+            <input
+              accept=".otf,.ttf,.woff,.woff2,font/*"
+              type="file"
+              onChange={(event) => importFont(event, 'en')}
+            />
+          </label>
+        </div>
       </div>
     </>
   )
