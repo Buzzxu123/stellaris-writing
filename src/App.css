@@ -1,3 +1,37 @@
+.stellaris-obsidian-root {
+  --night: #030a10;
+  --night-2: #07131d;
+  --ink: #eadfcb;
+  --muted: rgba(234, 223, 203, 0.62);
+  --gold: #e4b46e;
+  --blue-star: #b8dcff;
+  --font-zh: 'Songti SC', 'Noto Serif CJK SC', serif;
+  --font-en: 'Iowan Old Style', Georgia, serif;
+  --display: var(--font-en), var(--font-zh), Didot, 'Bodoni 72', serif;
+  --serif: var(--font-en), var(--font-zh), Georgia, serif;
+  --sans: 'Avenir Next', 'Helvetica Neue', 'PingFang SC', Arial, sans-serif;
+  color: var(--ink);
+  background: var(--night);
+  font-family: var(--serif);
+  font-size: 16px;
+  line-height: 1.5;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.stellaris-obsidian-root *,
+.stellaris-obsidian-root *::before,
+.stellaris-obsidian-root *::after {
+  box-sizing: border-box;
+}
+
+.stellaris-obsidian-root ::selection {
+  color: #1c130b;
+  background: var(--gold);
+}
+
 .app-shell {
   --panel-bg: rgba(3, 12, 19, 0.72);
   --sidebar-bg: rgba(3, 10, 16, 0.78);
@@ -10,7 +44,7 @@
   color: var(--ink);
   background:
     linear-gradient(rgba(2, 7, 13, 0.08), rgba(2, 7, 13, 0.24)),
-    url('./assets/celestial-background-wide.png') center center / auto 100% no-repeat,
+    url('assets/celestial-background-wide.png') center center / auto 100% no-repeat,
     radial-gradient(circle at 50% 50%, rgba(24, 67, 104, 0.18), transparent 34rem),
     radial-gradient(circle at 74% 24%, rgba(196, 145, 76, 0.12), transparent 24rem),
     linear-gradient(135deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
@@ -30,7 +64,7 @@
   --star-base-opacity: 0.3;
   background:
     linear-gradient(rgba(255, 250, 232, 0.18), rgba(255, 246, 220, 0.36)),
-    url('./assets/celestial-background-day.png') center center / auto 100% no-repeat,
+    url('assets/celestial-background-day.png') center center / auto 100% no-repeat,
     radial-gradient(circle at 50% 48%, rgba(255, 244, 205, 0.28), transparent 35rem),
     linear-gradient(135deg, rgba(113, 82, 41, 0.06) 1px, transparent 1px),
     #eff4f1;
@@ -60,7 +94,6 @@
 .theme-day .compact-card span,
 .theme-day .zodiac-orb strong,
 .theme-day .zodiac-orb small,
-.theme-day .focused-symbol,
 .theme-day .section-heading h1,
 .theme-day .section-heading p,
 .theme-day .section-heading small,
@@ -233,13 +266,13 @@ button {
   gap: 18px;
   background:
     linear-gradient(90deg, rgba(3, 10, 16, 0.76), rgba(3, 10, 16, 0.48)),
-    url('./assets/quote-card-background.png') center / cover;
+    url('assets/quote-card-background.png') center / cover;
 }
 
 .theme-day .moon-card {
   background:
     linear-gradient(90deg, rgba(255, 255, 255, 0.48), rgba(255, 255, 255, 0.18)),
-    url('./assets/quote-card-background-day.png') center / cover;
+    url('assets/quote-card-background-day.png') center / cover;
 }
 
 .moon-card span {
@@ -455,8 +488,8 @@ button {
   height: 148px;
   padding: 0;
   display: grid;
-  grid-template-rows: 28px 84px 18px 12px;
-  row-gap: 2px;
+  grid-template-rows: 92px 18px 12px;
+  row-gap: 3px;
   place-items: center;
   color: var(--ink);
   background: transparent;
@@ -466,15 +499,6 @@ button {
     transform 420ms ease,
     opacity 420ms ease,
     border-color 220ms ease;
-}
-
-.zodiac-orb span {
-  color: var(--gold);
-  font-family: var(--display);
-  font-style: italic;
-  font-size: 24px;
-  line-height: 1;
-  align-self: start;
 }
 
 .mini-map {
@@ -518,11 +542,6 @@ button {
   filter:
     drop-shadow(0 0 3px rgba(255, 224, 151, 1))
     drop-shadow(0 0 9px rgba(255, 178, 67, 0.86));
-}
-
-.theme-day .zodiac-orb span,
-.theme-day .focused-symbol {
-  color: #050505;
 }
 
 .theme-day .mini-map > circle,
@@ -569,20 +588,6 @@ button {
 .theme-day .constellation-panel {
   background: transparent;
   box-shadow: none;
-}
-
-.focused-symbol {
-  position: absolute;
-  top: 34px;
-  left: 50%;
-  z-index: 3;
-  color: var(--gold);
-  font-family: var(--display);
-  font-size: 36px;
-  font-style: italic;
-  line-height: 1;
-  transform: translateX(-50%);
-  pointer-events: none;
 }
 
 .section-heading {
@@ -633,7 +638,7 @@ button {
 
 .constellation-map {
   position: absolute;
-  top: 80px;
+  top: 58px;
   left: 50%;
   width: 203px;
   height: 140px;
@@ -865,7 +870,7 @@ button {
   background:
     linear-gradient(90deg, rgba(4, 13, 20, 0.82), rgba(4, 13, 20, 0.55)),
     linear-gradient(rgba(4, 13, 20, 0.34), rgba(4, 13, 20, 0.58)),
-    url('./assets/quote-card-background.png') center / cover,
+    url('assets/quote-card-background.png') center / cover,
     radial-gradient(circle at 80% 0%, rgba(224, 166, 89, 0.13), transparent 58%);
 }
 
@@ -873,7 +878,7 @@ button {
   background:
     linear-gradient(90deg, rgba(255, 255, 255, 0.52), rgba(255, 255, 255, 0.2)),
     linear-gradient(rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.34)),
-    url('./assets/quote-card-background-day.png') center / cover;
+    url('assets/quote-card-background-day.png') center / cover;
 }
 
 .quote-card textarea {
@@ -1097,8 +1102,18 @@ button {
   box-shadow: none;
 }
 
+.writing-surface:hover,
 .writing-surface:focus {
+  color: var(--ink);
+  background: rgba(2, 8, 13, 0.62);
   border-color: rgba(244, 200, 128, 0.66);
+}
+
+.theme-day .writing-surface:hover,
+.theme-day .writing-surface:focus {
+  color: #050505;
+  background: rgba(255, 255, 255, 0.66);
+  border-color: rgba(0, 0, 0, 0.28);
 }
 
 .anchor-index {
@@ -1973,7 +1988,7 @@ button {
   align-items: center;
   gap: 8px;
   color: var(--ink);
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--panel-bg);
   border: 1px solid rgba(224, 166, 89, 0.2);
   border-radius: 8px;
 }
@@ -2020,4 +2035,187 @@ button {
   .status-column {
     order: -1;
   }
+}
+
+.stellaris-obsidian-view,
+.stellaris-obsidian-root {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+.workspace-leaf-content[data-type='stellaris-writing-view'],
+.stellaris-obsidian-container {
+  height: 100% !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
+  background: #030a10 !important;
+}
+
+.workspace-leaf-content[data-type='stellaris-writing-view'] .view-content {
+  height: 100% !important;
+  min-height: 0 !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  background: #030a10 !important;
+}
+
+.stellaris-obsidian-view {
+  position: relative !important;
+  padding: 0 !important;
+  background: #030a10 !important;
+  isolation: isolate;
+}
+
+.stellaris-obsidian-root {
+  position: absolute !important;
+  inset: 0 !important;
+  z-index: 2;
+  display: block;
+}
+
+.stellaris-obsidian-root .app-shell {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.stellaris-obsidian-root button,
+.stellaris-obsidian-root input,
+.stellaris-obsidian-root textarea,
+.stellaris-obsidian-root select {
+  font: inherit !important;
+  box-shadow: none !important;
+}
+
+.stellaris-obsidian-root button {
+  margin: 0 !important;
+  appearance: none !important;
+  -webkit-appearance: none !important;
+  text-shadow: none !important;
+  cursor: pointer !important;
+}
+
+.stellaris-obsidian-root .brand,
+.stellaris-obsidian-root .zodiac-orb,
+.stellaris-obsidian-root .mini-map,
+.stellaris-obsidian-root .side-nav button {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
+.stellaris-obsidian-root .moon-toggle {
+  color: rgba(231, 221, 203, 0.78) !important;
+  background: rgba(3, 10, 16, 0.52) !important;
+  border: 1px solid rgba(224, 166, 89, 0.32) !important;
+}
+
+.stellaris-obsidian-root .theme-day .moon-toggle {
+  color: #050505 !important;
+  background:
+    linear-gradient(180deg, rgba(251, 238, 204, 0.82), rgba(214, 182, 126, 0.36)) !important;
+  border-color: rgba(0, 0, 0, 0.2) !important;
+}
+
+.stellaris-obsidian-root .primary-action {
+  color: #20170f !important;
+  background: linear-gradient(180deg, #f4d59c, #d8a963) !important;
+  border: 0 !important;
+}
+
+.stellaris-obsidian-root .secondary-action,
+.stellaris-obsidian-root .copy-button,
+.stellaris-obsidian-root .editor-meta button,
+.stellaris-obsidian-root .segmented-control button {
+  color: var(--ink) !important;
+  background: rgba(255, 255, 255, 0.04) !important;
+  border: 1px solid rgba(224, 166, 89, 0.2) !important;
+}
+
+.stellaris-obsidian-root .segmented-control button.active {
+  color: #21180f !important;
+  background: var(--gold) !important;
+}
+
+.modal-container:has(.stellaris-obsidian-modal),
+.stellaris-obsidian-modal-container {
+  padding: 0 !important;
+  background: #030a10 !important;
+}
+
+.stellaris-obsidian-modal {
+  overflow: hidden !important;
+}
+
+.stellaris-obsidian-modal .modal-close-button {
+  display: none !important;
+}
+
+.stellaris-obsidian-modal-root {
+  padding: 0 !important;
+  overflow: hidden !important;
+}
+
+.stellaris-react-mount {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+.stellaris-obsidian-modal-root .app-shell {
+  grid-template-columns: 248px minmax(0, 1fr) !important;
+  overflow: hidden !important;
+}
+
+.stellaris-obsidian-modal-root .sidebar {
+  height: 100% !important;
+  min-height: 0 !important;
+  padding: 30px 20px 24px !important;
+  display: flex !important;
+  grid-template-columns: none !important;
+}
+
+.stellaris-obsidian-modal-root .side-nav {
+  grid-template-columns: 1fr !important;
+}
+
+.stellaris-obsidian-modal-root .moon-card {
+  display: grid !important;
+}
+
+.stellaris-obsidian-modal-root .galaxy-layout {
+  grid-template-columns: minmax(0, 1fr) 344px !important;
+}
+
+.stellaris-obsidian-modal-root .status-column {
+  order: initial !important;
+}
+
+.stellaris-modal-close {
+  position: fixed !important;
+  top: 18px !important;
+  right: 20px !important;
+  z-index: 100000 !important;
+  width: 32px !important;
+  height: 32px !important;
+  border: 1px solid rgba(228, 180, 110, 0.34) !important;
+  border-radius: 999px !important;
+  display: grid;
+  place-items: center;
+  background: rgba(3, 12, 19, 0.62) !important;
+  color: rgba(234, 223, 203, 0.86) !important;
+  font-family: var(--sans);
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer !important;
+  backdrop-filter: blur(10px);
+}
+
+.stellaris-modal-close:hover {
+  border-color: rgba(228, 180, 110, 0.72);
+  background: rgba(228, 180, 110, 0.14);
 }
