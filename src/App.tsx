@@ -8,21 +8,8 @@ import type {
   PointerEvent,
   SetStateAction,
 } from 'react'
-
-type StellarisObsidianBridge = {
-  loadSnapshot: () => Promise<string | null>
-  saveSnapshot: (contents: string) => Promise<string>
-  exportMigrationFile: (contents: string) => Promise<string>
-  saveMarkdownFile: (payload: { filename: string; contents: string }) => Promise<string>
-  savePdfFile: (payload: { filename: string; contentsBase64: string }) => Promise<string>
-  openCanvasFile: (payload: { id: string; title: string; contents: string }) => Promise<string>
-}
-
-declare global {
-  interface Window {
-    StellarisObsidianBridge?: StellarisObsidianBridge
-  }
-}
+import { invoke } from '@tauri-apps/api/core'
+import './App.css'
 
 type ProgressState = 'unbound' | 'draft' | 'lit'
 type ViewMode =
@@ -831,23 +818,6 @@ function isTauriRuntime() {
   return '__TAURI_INTERNALS__' in window
 }
 
-function obsidianBridge() {
-  return window.StellarisObsidianBridge
-}
-
-function arrayBufferToBase64(buffer: ArrayBuffer) {
-  const bytes = new Uint8Array(buffer)
-  let binary = ''
-  const chunkSize = 0x8000
-
-  for (let index = 0; index < bytes.length; index += chunkSize) {
-    const chunk = bytes.subarray(index, index + chunkSize)
-    binary += String.fromCharCode(...chunk)
-  }
-
-  return window.btoa(binary)
-}
-
 function openFontDatabase() {
   return new Promise<IDBDatabase>((resolve, reject) => {
     const request = window.indexedDB.open(fontDatabaseName, 1)
@@ -1186,51 +1156,6 @@ function markdownForPiece(
   ].join('\n')
 }
 
-function obsidianCanvasForWhiteboard(board: Whiteboard) {
-  const nodes = [
-    ...board.nodes.map((node) => ({
-      id: node.id,
-      type: 'text',
-      x: Math.round(node.x),
-      y: Math.round(node.y),
-      width: 260,
-      height: 120,
-      text: node.text || board.title,
-    })),
-    ...board.images.map((image) => ({
-      id: image.id,
-      type: 'text',
-      x: Math.round(image.x),
-      y: Math.round(image.y),
-      width: Math.round(image.width),
-      height: Math.round(image.height),
-      text: 'Imported sketch image is stored in Stellaris plugin data.',
-    })),
-    ...board.strokes.map((stroke, index) => {
-      const first = stroke.points[0] ?? { x: 80 + index * 24, y: 80 + index * 24 }
-      return {
-        id: stroke.id,
-        type: 'text',
-        x: Math.round(first.x),
-        y: Math.round(first.y),
-        width: 240,
-        height: 90,
-        text: `Freehand stroke ${index + 1}`,
-      }
-    }),
-  ]
-  const edges = board.edges.map((edge) => ({
-    id: edge.id,
-    fromNode: edge.from,
-    fromSide: 'right',
-    toNode: edge.to,
-    toSide: 'left',
-    label: edge.label,
-  }))
-
-  return JSON.stringify({ nodes, edges }, null, 2)
-}
-
 function pieceForStar(
   pieces: Record<string, WritingPiece>,
   zodiacId: string,
@@ -1420,11 +1345,9 @@ function App() {
 
   async function saveSnapshotNow() {
     try {
-      const bridge = obsidianBridge()
-      const contents = JSON.stringify(createAppSnapshot(pieces, whiteboards, appCopy, themeMode, language))
-      const path = bridge
-        ? await bridge.saveSnapshot(contents)
-        : 'Browser preview storage'
+      const path = await invoke<string>('save_app_snapshot', {
+        contents: JSON.stringify(createAppSnapshot(pieces, whiteboards, appCopy, themeMode, language)),
+      })
       setMigrationNotice(`${t.backupSaved}${path}`)
     } catch (error) {
       console.warn('Unable to save app snapshot', error)
@@ -1434,7 +1357,7 @@ function App() {
 
   async function restoreSnapshot() {
     try {
-      const raw = await obsidianBridge()?.loadSnapshot()
+      const raw = await invoke<string | null>('load_app_snapshot')
 
       if (!raw) {
         setMigrationNotice(t.backupEmpty)
@@ -1458,12 +1381,13 @@ function App() {
 
   async function exportMigrationFile() {
     try {
-      const contents = JSON.stringify(
-        createAppSnapshot(pieces, whiteboards, appCopy, themeMode, language),
-        null,
-        2,
-      )
-      const path = await obsidianBridge()?.exportMigrationFile(contents)
+      const path = await invoke<string>('export_migration_file', {
+        contents: JSON.stringify(
+          createAppSnapshot(pieces, whiteboards, appCopy, themeMode, language),
+          null,
+          2,
+        ),
+      })
       setMigrationNotice(`${t.migrationExported}${path}`)
     } catch (error) {
       console.warn('Unable to export migration file', error)
@@ -1475,14 +1399,13 @@ function App() {
     let cancelled = false
 
     async function hydrateSnapshot() {
-      const bridge = obsidianBridge()
-      if (!bridge && !isTauriRuntime()) {
+      if (!isTauriRuntime()) {
         setSnapshotReady(true)
         return
       }
 
       try {
-        const raw = bridge ? await bridge.loadSnapshot() : null
+        const raw = await invoke<string | null>('load_app_snapshot')
         const snapshot = raw ? normalizeAppSnapshot(JSON.parse(raw)) : null
 
         if (!cancelled && snapshot) {
@@ -1521,8 +1444,7 @@ function App() {
   }, [whiteboards])
 
   useEffect(() => {
-    const bridge = obsidianBridge()
-    if (!snapshotReady || !bridge) {
+    if (!snapshotReady || !isTauriRuntime()) {
       return
     }
 
@@ -1534,7 +1456,7 @@ function App() {
     }
 
     const timer = window.setTimeout(() => {
-      bridge.saveSnapshot(serialized)
+      invoke<string>('save_app_snapshot', { contents: serialized })
         .then((path) => {
           lastSnapshotRef.current = serialized
           console.info(`Saved app snapshot: ${path}`)
@@ -1794,15 +1716,11 @@ function App() {
     )
 
     try {
-      const path = await obsidianBridge()?.saveMarkdownFile({
+      const path = await invoke<string>('save_markdown_file', {
         filename,
         contents: markdown,
       })
-      if (path) {
-        setSaveState(`Saved: ${path}`)
-      } else {
-        throw new Error('Obsidian bridge unavailable')
-      }
+      setSaveState(`Saved: ${path}`)
     } catch {
       const url = URL.createObjectURL(
         new Blob([markdown], { type: 'text/markdown;charset=utf-8' }),
@@ -1953,6 +1871,7 @@ function App() {
                     onMouseDown={(event) => event.preventDefault()}
                     onClick={() => selectZodiac(index)}
                   >
+                    <span>{textSymbol(zodiac.symbol)}</span>
                     <svg className="mini-map" viewBox="0 0 100 100" aria-hidden="true">
                       {zodiac.connections.map((connection) => {
                         const from = zodiac.stars.find(
@@ -2009,6 +1928,7 @@ function App() {
               })}
             </div>
             <section className="constellation-panel" aria-labelledby="constellation-title">
+              <span className="focused-symbol">{textSymbol(selectedZodiac.symbol)}</span>
               <div className="section-heading">
                 <div>
                   <h1 id="constellation-title">
@@ -2788,33 +2708,7 @@ function WhiteboardsView({
       doc.setFontSize(10)
       doc.text(node.text, tx(node.x) + 10, ty(node.y) - 8)
     })
-    const filename = `${safeMarkdownFilename(selectedBoard.title).replace(/\.md$/i, '')}.pdf`
-    const bridge = obsidianBridge()
-
-    if (bridge) {
-      await bridge.savePdfFile({
-        filename,
-        contentsBase64: arrayBufferToBase64(doc.output('arraybuffer')),
-      })
-      return
-    }
-
-    doc.save(filename)
-  }
-
-  async function openObsidianCanvas() {
-    if (!selectedBoard) return
-    const bridge = obsidianBridge()
-
-    if (!bridge) {
-      return
-    }
-
-    await bridge.openCanvasFile({
-      id: selectedBoard.id,
-      title: selectedBoard.title,
-      contents: obsidianCanvasForWhiteboard(selectedBoard),
-    })
+    doc.save(`${safeMarkdownFilename(selectedBoard.title).replace(/\.md$/i, '')}.pdf`)
   }
 
   return (
@@ -2824,9 +2718,6 @@ function WhiteboardsView({
         <h1>{t.whiteboardsTitle}</h1>
         <button type="button" onClick={createBoard}>
           {t.newWhiteboard}
-        </button>
-        <button type="button" onClick={openObsidianCanvas}>
-          {language === 'zh' ? '打开 Obsidian 白板' : 'Open Obsidian Canvas'}
         </button>
       </div>
       <div className="whiteboard-shell">
